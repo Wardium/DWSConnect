@@ -37,18 +37,17 @@
         }
     }
 
-    // Assigns top-to-bottom stagger delays based on actual Y row coordinates
+// Assigns slower, smoother top-to-bottom stagger delays based on Y row coordinates
     window.recalculateTopToBottomStagger = function () {
         const widgets = Array.from(appGrid.querySelectorAll(".app-widget"));
         if (!widgets.length) return;
 
-        // Group widgets by their vertical offsetTop row
         const rowTops = [...new Set(widgets.map((w) => w.offsetTop))].sort((a, b) => a - b);
 
         widgets.forEach((widget, idx) => {
             const rowIndex = rowTops.indexOf(widget.offsetTop);
-            // Primary delay by row (top-to-bottom), subtle secondary offset within the row
-            const delayMs = rowIndex * 95 + (idx % 6) * 22;
+            // 150ms per vertical row + 35ms gentle horizontal wave
+            const delayMs = rowIndex * 150 + (idx % 6) * 35;
             widget.style.setProperty("--stagger-delay", `${delayMs}ms`);
         });
     };

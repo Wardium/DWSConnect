@@ -10,30 +10,7 @@
 
     <!-- 1. 2.45s @ 60fps (147 frames) Black Screen SVG Boot Sequence -->
     <div id="boot-overlay">
-        <svg id="boot-svg" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
-            <defs>
-                <linearGradient id="bootGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-                    <stop offset="0%" stop-color="#60a5fa" />
-                    <stop offset="50%" stop-color="#c084fc" />
-                    <stop offset="100%" stop-color="#38bdf8" />
-                </linearGradient>
-                <filter id="bootGlow" x="-30%" y="-30%" width="160%" height="160%">
-                    <feGaussianBlur stdDeviation="8" result="blur" />
-                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
-                </filter>
-            </defs>
-            <!-- Outer precision ring -->
-            <circle id="boot-ring-outer" cx="200" cy="200" r="110" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2" />
-            <!-- 60fps driven progress arc -->
-            <circle id="boot-ring-prog" cx="200" cy="200" r="110" fill="none" stroke="url(#bootGrad)" stroke-width="4"
-                    stroke-linecap="round" stroke-dasharray="691.15" stroke-dashoffset="691.15" filter="url(#bootGlow)" />
-            <!-- Dynamic morphing squircle core -->
-            <rect id="boot-squircle" x="155" y="155" width="90" height="90" rx="24" fill="none"
-                  stroke="url(#bootGrad)" stroke-width="3" filter="url(#bootGlow)" />
-            <!-- Frame telemetry -->
-            <text id="boot-telemetry" x="200" y="355" text-anchor="middle" fill="rgba(255,255,255,0.55)"
-                  font-family="monospace" font-size="11" letter-spacing="2">FRAME 000 / 147</text>
-        </svg>
+        <div id="boot-svg-container"></div>
     </div>
 
     <!-- 2. Multi-Layer Parallax Background (Supports SVG & PNG) -->

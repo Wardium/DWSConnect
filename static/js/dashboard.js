@@ -37,6 +37,22 @@
         }
     }
 
+    // Assigns top-to-bottom stagger delays based on actual Y row coordinates
+    window.recalculateTopToBottomStagger = function () {
+        const widgets = Array.from(appGrid.querySelectorAll(".app-widget"));
+        if (!widgets.length) return;
+
+        // Group widgets by their vertical offsetTop row
+        const rowTops = [...new Set(widgets.map((w) => w.offsetTop))].sort((a, b) => a - b);
+
+        widgets.forEach((widget, idx) => {
+            const rowIndex = rowTops.indexOf(widget.offsetTop);
+            // Primary delay by row (top-to-bottom), subtle secondary offset within the row
+            const delayMs = rowIndex * 95 + (idx % 6) * 22;
+            widget.style.setProperty("--stagger-delay", `${delayMs}ms`);
+        });
+    };
+
     function renderAppGrid(apps) {
         appGrid.innerHTML = "";
         apps.forEach((app) => {
@@ -65,9 +81,11 @@
             widget.appendChild(squircle);
             widget.appendChild(title);
 
-            widget.addEventListener("click", (e) => handleAppLaunch(app, squircle));
+            widget.addEventListener("click", () => handleAppLaunch(app, squircle));
             appGrid.appendChild(widget);
         });
+
+        requestAnimationFrame(() => window.recalculateTopToBottomStagger());
     }
 
     function handleAppLaunch(app, squircleEl) {
@@ -76,7 +94,6 @@
             return;
         }
 
-        // Compute origin coordinates from the clicked icon for morph expansion
         const rect = squircleEl.getBoundingClientRect();
         const originX = rect.left + rect.width / 2;
         const originY = rect.top + rect.height / 2;
@@ -108,7 +125,6 @@
         }
     });
 
-    // Settings Modal Controls
     settingsTrigger.addEventListener("click", () => settingsModal.classList.remove("hidden"));
     settingsClose.addEventListener("click", () => settingsModal.classList.add("hidden"));
 
@@ -146,7 +162,7 @@
             const row = document.createElement("div");
             row.className = "settings-app-item";
             row.innerHTML = `
-                <span><strong>${app.name}</strong> (${app.iframe ? "Iframe" : "New Tab"}) — ${app.url}</span>
+                <span><strong>${app.name}</strong> (${app.iframe ? "Iframe" : "Tab"})</span>
                 <button class="liquid-close-btn" data-id="${app.id}" title="Delete">✕</button>
             `;
             row.querySelector("button").addEventListener("click", async () => {
@@ -162,5 +178,6 @@
         });
     }
 
+    window.addEventListener("resize", () => window.recalculateTopToBottomStagger());
     window.addEventListener("DOMContentLoaded", loadServerState);
 })();

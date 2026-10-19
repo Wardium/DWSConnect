@@ -2,21 +2,23 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>Liquid Glass Core</title>
     <link rel="stylesheet" href="/static/css/liquid_glass.css">
 </head>
 <body>
 
-    <!-- 1. 2.45s @ 60fps (147 frames) Black Screen SVG Boot Sequence -->
-    <div id="boot-overlay">
-        <div id="boot-svg-container"></div>
-    </div>
+    <!-- Black curtain that slowly fades away after 2.45s -->
+    <div id="boot-curtain"></div>
 
-    <!-- 2. Multi-Layer Parallax Background (Supports SVG & PNG) -->
+    <!-- Persistent SVG container: starts centered for 2.45s, freezes, then shrinks into the top header -->
+    <header id="brand-header" class="state-booting">
+        <div id="boot-svg-container"></div>
+    </header>
+
+    <!-- Multi-Layer Parallax Background (SVG / PNG) -->
     <div id="parallax-viewport">
         <div id="parallax-bg-layer" class="parallax-layer" data-depth="0.04">
-            <!-- Default animated SVG fallback if no custom PNG/SVG is uploaded -->
             <svg id="default-bg-svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
                 <defs>
                     <radialGradient id="orb1" cx="30%" cy="30%" r="50%">
@@ -39,27 +41,26 @@
             </svg>
             <img id="custom-bg-img" src="" alt="Custom Background" class="hidden" />
         </div>
-        <!-- Secondary floating glass ambient layer -->
         <div class="parallax-layer ambient-grid" data-depth="0.08"></div>
     </div>
 
-    <!-- 3. Main Centered App Grid Workspace -->
+    <!-- Centered App Grid Workspace -->
     <main id="workspace">
         <div id="app-grid" class="liquid-grid">
-            <!-- Populated dynamically from server settings.json -->
+            <!-- Populated dynamically via dashboard.js -->
         </div>
     </main>
 
-    <!-- 4. Floating Settings Trigger Button -->
-    <button id="settings-trigger" class="liquid-glass-pill" title="Server Settings">
-        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+    <!-- Floating Liquid Glass Settings Trigger -->
+    <button id="settings-trigger" class="liquid-glass-pill ui-chrome" title="Server Settings">
+        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
             <circle cx="12" cy="12" r="3"></circle>
             <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
         </svg>
         <span>Settings</span>
     </button>
 
-    <!-- 5. Expanding Iframe Container (Padded to preserve background visibility) -->
+    <!-- Expanding Liquid Glass Iframe Stage -->
     <div id="iframe-Stage" class="iframe-stage hidden">
         <div id="iframe-window" class="liquid-glass-window">
             <div class="iframe-header">
@@ -70,66 +71,41 @@
         </div>
     </div>
 
-    <!-- 6. Server-Persisted Settings Modal -->
+    <!-- True Liquid Glass Settings Modal -->
     <div id="settings-modal" class="modal-backdrop hidden">
         <div class="liquid-glass-modal">
             <div class="modal-header">
-                <h2>Server Settings & Widgets</h2>
+                <h2>Liquid Glass Settings</h2>
                 <button id="settings-close" class="liquid-close-btn">✕</button>
             </div>
 
             <div class="modal-body">
                 <!-- Add New App Widget Form -->
-                <form id="add-app-form" class="glass-section">
+                <form id="add-app-form" class="glass-card">
                     <h3>Add App Widget</h3>
-                    <div class="form-row">
-                        <label>App Name</label>
-                        <input type="text" name="name" placeholder="e.g., Jellyfin, Nextcloud, OctoPrint" required />
+                    <div class="form-grid">
+                        <div class="form-row">
+                            <label>App Name</label>
+                            <input type="text" class="glass-input" name="name" placeholder="Jellyfin, Nextcloud..." required />
+                        </div>
+                        <div class="form-row">
+                            <label>Target URL</label>
+                            <input type="url" class="glass-input" name="url" placeholder="https://..." required />
+                        </div>
                     </div>
-                    <div class="form-row">
-                        <label>Target URL</label>
-                        <input type="url" name="url" placeholder="https://..." required />
+                    <div class="form-grid">
+                        <div class="form-row">
+                            <label>Transparent Icon (PNG/SVG)</label>
+                            <input type="file" class="glass-file-input" name="icon_file" accept=".png,.svg,.webp,.gif" />
+                        </div>
+                        <div class="form-row">
+                            <label>Or Icon URL</label>
+                            <input type="url" class="glass-input" name="icon_url" placeholder="https://.../icon.png" />
+                        </div>
                     </div>
-                    <div class="form-row">
-                        <label>Icon Upload (PNG/SVG with transparency)</label>
-                        <input type="file" name="icon_file" accept=".png,.svg,.webp,.gif" />
-                    </div>
-                    <div class="form-row">
-                        <label>Or Icon URL (optional)</label>
-                        <input type="url" name="icon_url" placeholder="https://.../icon.png" />
-                    </div>
-                    <div class="form-row checkbox-row">
+                    <label class="glass-toggle-row" for="iframe-toggle">
                         <input type="checkbox" id="iframe-toggle" name="iframe" value="true" checked />
-                        <label for="iframe-toggle">Open inside expanding Liquid Glass Iframe</label>
-                    </div>
-                    <button type="submit" class="liquid-submit-btn">Save Widget to Server</button>
-                </form>
-
-                <!-- Background Configuration -->
-                <form id="bg-form" class="glass-section">
-                    <h3>Wallpaper (SVG / PNG / WebP)</h3>
-                    <div class="form-row">
-                        <label>Upload Background to Server</label>
-                        <input type="file" name="bg_file" accept=".svg,.png,.jpg,.jpeg,.webp" />
-                    </div>
-                    <div class="form-row">
-                        <label>Or Background URL (Leave blank for default animated SVG)</label>
-                        <input type="text" name="bg_url" placeholder="/static/uploads/..." />
-                    </div>
-                    <button type="submit" class="liquid-submit-btn">Apply Background</button>
-                </form>
-
-                <!-- Existing Apps List -->
-                <div class="glass-section">
-                    <h3>Installed Widgets</h3>
-                    <div id="settings-app-list" class="settings-app-list"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <script src="/static/js/boot_anim.js"></script>
-    <script src="/static/js/parallax.js"></script>
-    <script src="/static/js/dashboard.js"></script>
-</body>
-</html>
+                        <span class="glass-toggle-slider"></span>
+                        <span class="glass-toggle-label">Expand inside Liquid Glass Iframe</span>
+                    </label>
+                    <button type="submit" class="liquid

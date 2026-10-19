@@ -4,8 +4,10 @@
     --glass-border-hi: rgba(255, 255, 255, 0.38);
     --glass-border-lo: rgba(255, 255, 255, 0.10);
     --glass-blur: blur(28px) saturate(190%);
-    --spring-bubbly: cubic-bezier(0.34, 1.56, 0.64, 1);
-    --smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+    /* Slower, silkier easing curves */
+    --spring-bubbly: cubic-bezier(0.28, 1.38, 0.54, 1);
+    --smooth-out: cubic-bezier(0.16, 1, 0.3, 1);
+    --silk-in-out: cubic-bezier(0.33, 1, 0.68, 1);
 }
 
 * {
@@ -30,7 +32,7 @@ body, html {
 }
 
 /* =========================================================
-   1. SEAMLESS INTRO CURTAIN & DOCKING SVG HEADER
+   1. SEAMLESS INTRO CURTAIN & FLOATING SVG HEADER (NO BOX)
    ========================================================= */
 #boot-curtain {
     position: fixed;
@@ -39,8 +41,8 @@ body, html {
     z-index: 900;
     pointer-events: none;
     opacity: 1;
-    /* Slow, seamless fade out so the parallax background emerges gently */
-    transition: opacity 1.65s cubic-bezier(0.4, 0, 0.2, 1);
+    /* Slow 2.8s dissolve to reveal the parallax background */
+    transition: opacity 2.8s var(--silk-in-out);
 }
 
 #boot-curtain.fade-away {
@@ -49,51 +51,33 @@ body, html {
 
 #brand-header {
     position: fixed;
+    top: 0;
     left: 50%;
+    width: min(440px, 88vw);
+    height: 240px;
     z-index: 950;
     display: flex;
     align-items: center;
     justify-content: center;
     pointer-events: none;
-    will-change: top, transform, padding, background, border-radius;
-    transition:
-        top 0.95s var(--smooth-out),
-        transform 0.95s var(--smooth-out),
-        padding 0.95s var(--smooth-out),
-        background 0.8s ease,
-        border-color 0.8s ease,
-        box-shadow 0.8s ease;
+    background: none;
+    border: none;
+    box-shadow: none;
+    backdrop-filter: none;
+    transform-origin: top center;
+    will-change: transform;
+    /* Long, heavily eased 2.1s glide to the top header */
+    transition: transform 2.1s var(--smooth-out);
 }
 
-/* Initial 2.45s boot state: full size in center of screen */
+/* Initial 2.45s boot state: large and centered on screen */
 #brand-header.state-booting {
-    top: 50%;
-    transform: translate(-50%, -50%) scale(1);
-    width: 240px;
-    height: 240px;
-    border-radius: 40px;
-    background: transparent;
-    border: 1px solid transparent;
+    transform: translate3d(-50%, calc(50dvh - 120px), 0) scale(1);
 }
 
-/* Post-2.45s state: frozen on last frame, shrunk & docked at top as header */
+/* Post-2.45s state: no box, larger floating header at top */
 #brand-header.state-docked {
-    top: max(16px, env(safe-area-inset-top, 16px));
-    transform: translate(-50%, 0) scale(1);
-    width: auto;
-    height: 54px;
-    padding: 8px 22px;
-    border-radius: 999px;
-    background: var(--glass-surface);
-    backdrop-filter: var(--glass-blur);
-    -webkit-backdrop-filter: var(--glass-blur);
-    border-top: 1px solid var(--glass-border-hi);
-    border-left: 1px solid var(--glass-border-hi);
-    border-right: 1px solid var(--glass-border-lo);
-    border-bottom: 1px solid var(--glass-border-lo);
-    box-shadow:
-        0 12px 30px rgba(0, 0, 0, 0.35),
-        inset 0 1px 1px rgba(255, 255, 255, 0.4);
+    transform: translate3d(-50%, max(18px, env(safe-area-inset-top, 18px)), 0) scale(0.55);
 }
 
 #boot-svg-container {
@@ -109,6 +93,7 @@ body, html {
     height: 100%;
     max-height: 100%;
     object-fit: contain;
+    overflow: visible;
 }
 
 /* Freezes CSS keyframe animations inside the SVG on the final frame */
@@ -149,7 +134,7 @@ body, html {
 }
 
 /* =========================================================
-   3. X-AXIS EXPANDING WIDGET BOX & TOP-TO-BOTTOM ICONS
+   3. SLOWER X-AXIS WIDGET BOX & TOP-TO-BOTTOM ICONS
    ========================================================= */
 #workspace {
     position: relative;
@@ -159,7 +144,7 @@ body, html {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 84px 24px 76px;
+    padding: 150px 24px 76px; /* Extra top clearance for the larger floating SVG header */
 }
 
 .liquid-grid {
@@ -190,18 +175,19 @@ body, html {
     transform: scaleX(0);
     transform-origin: center center;
     opacity: 0;
+    will-change: transform, opacity;
+    /* Slower, deeply eased 1.5s horizontal unfold */
     transition:
-        transform 0.65s cubic-bezier(0.22, 1, 0.36, 1),
-        opacity 0.25s ease;
+        transform 1.5s var(--smooth-out),
+        opacity 0.75s var(--silk-in-out);
 }
 
-/* Triggered after SVG docks to header: opens along X-axis */
 .liquid-grid.box-open-x {
     transform: scaleX(1);
     opacity: 1;
 }
 
-/* App Widget Base & Top-to-Bottom Reveal State */
+/* App Widget Base & Slower Top-to-Bottom Reveal */
 .app-widget {
     display: flex;
     flex-direction: column;
@@ -209,10 +195,11 @@ body, html {
     gap: 8px;
     cursor: pointer;
     opacity: 0;
-    transform: translateY(-18px) scale(0.88);
+    transform: translateY(-22px) scale(0.86);
+    will-change: transform, opacity;
     transition:
-        opacity 0.45s var(--smooth-out),
-        transform 0.55s var(--spring-bubbly);
+        opacity 0.95s var(--smooth-out),
+        transform 1.05s var(--spring-bubbly);
     transition-delay: var(--stagger-delay, 0ms);
 }
 
@@ -221,7 +208,7 @@ body, html {
     transform: translateY(0) scale(1);
 }
 
-/* Refined, sleek Apple Squircle dimensions */
+/* Apple Squircle Icon */
 .app-squircle {
     position: relative;
     width: 66px;
@@ -243,9 +230,9 @@ body, html {
     justify-content: center;
     overflow: hidden;
     transition:
-        transform 0.5s var(--spring-bubbly),
-        box-shadow 0.4s var(--smooth-out),
-        background 0.3s ease;
+        transform 0.65s var(--spring-bubbly),
+        box-shadow 0.55s var(--smooth-out),
+        background 0.4s ease;
 }
 
 .app-squircle::before {
@@ -254,7 +241,7 @@ body, html {
     inset: 0;
     background: radial-gradient(circle at 30% 20%, rgba(255,255,255,0.38), transparent 62%);
     opacity: 0;
-    transition: opacity 0.35s ease;
+    transition: opacity 0.45s ease;
     pointer-events: none;
 }
 
@@ -284,7 +271,7 @@ body, html {
 
 .app-widget:active .app-squircle {
     transform: scale(0.92);
-    transition-duration: 0.12s;
+    transition-duration: 0.15s;
 }
 
 .app-squircle img {
@@ -292,7 +279,7 @@ body, html {
     height: 64%;
     object-fit: contain;
     filter: drop-shadow(0 3px 6px rgba(0,0,0,0.28));
-    transition: transform 0.5s var(--spring-bubbly);
+    transition: transform 0.65s var(--spring-bubbly);
 }
 
 .app-fallback-letter {
@@ -314,7 +301,7 @@ body, html {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    transition: transform 0.45s var(--spring-bubbly), color 0.3s ease;
+    transition: transform 0.55s var(--spring-bubbly), color 0.35s ease;
 }
 
 /* =========================================================
@@ -348,11 +335,11 @@ body, html {
     flex-direction: column;
     overflow: hidden;
     transform-origin: var(--origin-x, 50%) var(--origin-y, 50%);
-    animation: expandFromIcon 0.52s var(--spring-bubbly) forwards;
+    animation: expandFromIcon 0.72s var(--smooth-out) forwards;
 }
 
 .liquid-glass-window.closing {
-    animation: shrinkToIcon 0.34s var(--smooth-out) forwards;
+    animation: shrinkToIcon 0.48s var(--smooth-out) forwards;
 }
 
 @keyframes expandFromIcon {
@@ -393,11 +380,11 @@ body, html {
    ========================================================= */
 .ui-chrome {
     opacity: 0;
-    transform: translateY(12px);
+    transform: translateY(14px);
     transition:
-        opacity 0.5s ease,
-        transform 0.45s var(--spring-bubbly),
-        background 0.3s ease;
+        opacity 0.85s var(--smooth-out),
+        transform 0.85s var(--spring-bubbly),
+        background 0.35s ease;
 }
 
 .ui-chrome.chrome-visible {
@@ -468,7 +455,7 @@ body, html {
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    animation: expandFromIcon 0.42s var(--spring-bubbly);
+    animation: expandFromIcon 0.6s var(--smooth-out);
 }
 
 .modal-header {
@@ -548,7 +535,7 @@ body, html {
     font-size: 12.5px;
     outline: none;
     box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
-    transition: background 0.25s ease, border-color 0.25s ease, transform 0.25s var(--spring-bubbly);
+    transition: background 0.3s ease, border-color 0.3s ease, transform 0.35s var(--spring-bubbly);
 }
 
 .glass-input::placeholder {
@@ -561,7 +548,6 @@ body, html {
     transform: scale(1.01);
 }
 
-/* Liquid Glass Pill Switch */
 .glass-toggle-row {
     display: flex;
     align-items: center;
@@ -582,7 +568,7 @@ body, html {
     background: rgba(255, 255, 255, 0.12);
     border: 1px solid rgba(255, 255, 255, 0.28);
     box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.3);
-    transition: background 0.35s ease;
+    transition: background 0.4s ease;
 }
 
 .glass-toggle-slider::after {
@@ -595,7 +581,7 @@ body, html {
     border-radius: 50%;
     background: #fff;
     box-shadow: 0 2px 6px rgba(0, 0, 0, 0.35);
-    transition: transform 0.4s var(--spring-bubbly);
+    transition: transform 0.45s var(--spring-bubbly);
 }
 
 .glass-toggle-row input:checked + .glass-toggle-slider {
@@ -627,7 +613,7 @@ body, html {
     box-shadow:
         0 8px 20px rgba(0, 0, 0, 0.25),
         inset 0 1px 1px rgba(255, 255, 255, 0.45);
-    transition: transform 0.35s var(--spring-bubbly), background 0.25s ease;
+    transition: transform 0.45s var(--spring-bubbly), background 0.3s ease;
 }
 
 .liquid-submit-btn:hover {
@@ -648,7 +634,7 @@ body, html {
     display: flex;
     align-items: center;
     justify-content: center;
-    transition: transform 0.35s var(--spring-bubbly), background 0.25s ease;
+    transition: transform 0.4s var(--spring-bubbly), background 0.3s ease;
 }
 
 .liquid-close-btn:hover {
@@ -684,18 +670,21 @@ body, html {
    6. PHONE & MOBILE RESPONSIVE ADAPTATION
    ========================================================= */
 @media (max-width: 640px) {
+    #brand-header {
+        width: min(340px, 86vw);
+        height: 190px;
+    }
+
     #brand-header.state-booting {
-        width: 170px;
-        height: 170px;
+        transform: translate3d(-50%, calc(50dvh - 95px), 0) scale(1);
     }
 
     #brand-header.state-docked {
-        height: 44px;
-        padding: 6px 16px;
+        transform: translate3d(-50%, max(14px, env(safe-area-inset-top, 14px)), 0) scale(0.56);
     }
 
     #workspace {
-        padding: 72px 14px 70px;
+        padding: 122px 14px 70px;
     }
 
     .liquid-grid {

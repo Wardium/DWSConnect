@@ -108,4 +108,36 @@
                         <span class="glass-toggle-slider"></span>
                         <span class="glass-toggle-label">Expand inside Liquid Glass Iframe</span>
                     </label>
-                    <button type="submit" class="liquid
+                    <button type="submit" class="liquid-submit-btn">Add Widget</button>
+                </form>
+
+                <!-- Background Configuration -->
+                <form id="bg-form" class="glass-card">
+                    <h3>Wallpaper (SVG / PNG / WebP)</h3>
+                    <div class="form-grid">
+                        <div class="form-row">
+                            <label>Upload Wallpaper</label>
+                            <input type="file" class="glass-file-input" name="bg_file" accept=".svg,.png,.jpg,.jpeg,.webp" />
+                        </div>
+                        <div class="form-row">
+                            <label>Or Wallpaper Path/URL</label>
+                            <input type="text" class="glass-input" name="bg_url" placeholder="Blank = Default SVG" />
+                        </div>
+                    </div>
+                    <button type="submit" class="liquid-submit-btn">Update Wallpaper</button>
+                </form>
+
+                <!-- Installed Widgets List -->
+                <div class="glass-card">
+                    <h3>Installed Widgets</h3>
+                    <div id="settings-app-list" class="settings-app-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/boot_anim.js"></script>
+    <script src="/static/js/parallax.js"></script>
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Liquid Glass Core</title>
+    <link rel="stylesheet" href="/static/css/liquid_glass.css">
+</head>
+<body>
+
+    <!-- 1. 2.45s @ 60fps (147 frames) Black Screen SVG Boot Sequence -->
+    <div id="boot-overlay">
+        <svg id="boot-svg" viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg">
+            <defs>
+                <linearGradient id="bootGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stop-color="#60a5fa" />
+                    <stop offset="50%" stop-color="#c084fc" />
+                    <stop offset="100%" stop-color="#38bdf8" />
+                </linearGradient>
+                <filter id="bootGlow" x="-30%" y="-30%" width="160%" height="160%">
+                    <feGaussianBlur stdDeviation="8" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                </filter>
+            </defs>
+            <!-- Outer precision ring -->
+            <circle id="boot-ring-outer" cx="200" cy="200" r="110" fill="none" stroke="rgba(255,255,255,0.12)" stroke-width="2" />
+            <!-- 60fps driven progress arc -->
+            <circle id="boot-ring-prog" cx="200" cy="200" r="110" fill="none" stroke="url(#bootGrad)" stroke-width="4"
+                    stroke-linecap="round" stroke-dasharray="691.15" stroke-dashoffset="691.15" filter="url(#bootGlow)" />
+            <!-- Dynamic morphing squircle core -->
+            <rect id="boot-squircle" x="155" y="155" width="90" height="90" rx="24" fill="none"
+                  stroke="url(#bootGrad)" stroke-width="3" filter="url(#bootGlow)" />
+            <!-- Frame telemetry -->
+            <text id="boot-telemetry" x="200" y="355" text-anchor="middle" fill="rgba(255,255,255,0.55)"
+                  font-family="monospace" font-size="11" letter-spacing="2">FRAME 000 / 147</text>
+        </svg>
+    </div>
+
+    <!-- 2. Multi-Layer Parallax Background (Supports SVG & PNG) -->
+    <div id="parallax-viewport">
+        <div id="parallax-bg-layer" class="parallax-layer" data-depth="0.04">
+            <!-- Default animated SVG fallback if no custom PNG/SVG is uploaded -->
+            <svg id="default-bg-svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+                <defs>
+                    <radialGradient id="orb1" cx="30%" cy="30%" r="50%">
+                        <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.45"/>
+                        <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+                    </radialGradient>
+                    <radialGradient id="orb2" cx="70%" cy="65%" r="50%">
+                        <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.4"/>
+                        <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+                    </radialGradient>
+                    <radialGradient id="orb3" cx="50%" cy="20%" r="45%">
+                        <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.35"/>
+                        <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+                    </radialGradient>
+                </defs>
+                <rect width="1920" height="1080" fill="#060913"/>
+                <circle id="svg-orb-1" cx="550" cy="380" r="550" fill="url(#orb1)"/>
+                <circle id="svg-orb-2" cx="1350" cy="700" r="600" fill="url(#orb2)"/>
+                <circle id="svg-orb-3" cx="960" cy="250" r="480" fill="url(#orb3)"/>
+            </svg>
+            <img id="custom-bg-img" src="" alt="Custom Background" class="hidden" />
+        </div>
+        <!-- Secondary floating glass ambient layer -->
+        <div class="parallax-layer ambient-grid" data-depth="0.08"></div>
+    </div>
+
+    <!-- 3. Main Centered App Grid Workspace -->
+    <main id="workspace">
+        <div id="app-grid" class="liquid-grid">
+            <!-- Populated dynamically from server settings.json -->
+        </div>
+    </main>
+
+    <!-- 4. Floating Settings Trigger Button -->
+    <button id="settings-trigger" class="liquid-glass-pill" title="Server Settings">
+        <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none">
+            <circle cx="12" cy="12" r="3"></circle>
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+        </svg>
+        <span>Settings</span>
+    </button>
+
+    <!-- 5. Expanding Iframe Container (Padded to preserve background visibility) -->
+    <div id="iframe-Stage" class="iframe-stage hidden">
+        <div id="iframe-window" class="liquid-glass-window">
+            <div class="iframe-header">
+                <span id="iframe-title">Application</span>
+                <button id="iframe-close" class="liquid-close-btn" title="Close (Esc)">✕</button>
+            </div>
+            <iframe id="app-iframe" src="about:blank" allowfullscreen></iframe>
+        </div>
+    </div>
+
+    <!-- 6. Server-Persisted Settings Modal -->
+    <div id="settings-modal" class="modal-backdrop hidden">
+        <div class="liquid-glass-modal">
+            <div class="modal-header">
+                <h2>Server Settings & Widgets</h2>
+                <button id="settings-close" class="liquid-close-btn">✕</button>
+            </div>
+
+            <div class="modal-body">
+                <!-- Add New App Widget Form -->
+                <form id="add-app-form" class="glass-section">
+                    <h3>Add App Widget</h3>
+                    <div class="form-row">
+                        <label>App Name</label>
+                        <input type="text" name="name" placeholder="e.g., Jellyfin, Nextcloud, OctoPrint" required />
+                    </div>
+                    <div class="form-row">
+                        <label>Target URL</label>
+                        <input type="url" name="url" placeholder="https://..." required />
+                    </div>
+                    <div class="form-row">
+                        <label>Icon Upload (PNG/SVG with transparency)</label>
+                        <input type="file" name="icon_file" accept=".png,.svg,.webp,.gif" />
+                    </div>
+                    <div class="form-row">
+                        <label>Or Icon URL (optional)</label>
+                        <input type="url" name="icon_url" placeholder="https://.../icon.png" />
+                    </div>
+                    <div class="form-row checkbox-row">
+                        <input type="checkbox" id="iframe-toggle" name="iframe" value="true" checked />
+                        <label for="iframe-toggle">Open inside expanding Liquid Glass Iframe</label>
+                    </div>
+                    <button type="submit" class="liquid-submit-btn">Save Widget to Server</button>
+                </form>
+
+                <!-- Background Configuration -->
+                <form id="bg-form" class="glass-section">
+                    <h3>Wallpaper (SVG / PNG / WebP)</h3>
+                    <div class="form-row">
+                        <label>Upload Background to Server</label>
+                        <input type="file" name="bg_file" accept=".svg,.png,.jpg,.jpeg,.webp" />
+                    </div>
+                    <div class="form-row">
+                        <label>Or Background URL (Leave blank for default animated SVG)</label>
+                        <input type="text" name="bg_url" placeholder="/static/uploads/..." />
+                    </div>
+                    <button type="submit" class="liquid-submit-btn">Apply Background</button>
+                </form>
+
+                <!-- Existing Apps List -->
+                <div class="glass-section">
+                    <h3>Installed Widgets</h3>
+                    <div id="settings-app-list" class="settings-app-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="/static/js/boot_anim.js"></script>
+    <script src="/static/js/parallax.js"></script>
+    <script src="/static/js/dashboard.js"></script>
+</body>
+</html>

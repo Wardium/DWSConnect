@@ -28,11 +28,13 @@
         </svg>
     `;
 
-    async function loadAndStartBoot() {
+    async function initBootSequence() {
+        // 1. Wait until boot.svg is fully fetched and injected into the DOM
         try {
             const res = await fetch(BOOT_SVG_PATH);
             if (res.ok) {
-                container.innerHTML = await res.text();
+                const svgCode = await res.text();
+                container.innerHTML = svgCode;
             } else {
                 container.innerHTML = FALLBACK_SVG;
             }
@@ -41,10 +43,14 @@
         }
 
         svgElement = container.querySelector("svg");
-        if (svgElement && typeof svgElement.setCurrentTime === "function") {
-            svgElement.setCurrentTime(0);
+        if (svgElement) {
+            // Force reset any internal SVG SMIL animations to time 0
+            if (typeof svgElement.setCurrentTime === "function") {
+                svgElement.setCurrentTime(0);
+            }
         }
 
+        // 2. Everything is loaded and ready: start the 60fps clock on the next paint frame
         requestAnimationFrame(stepBootAnimation);
     }
 
@@ -75,7 +81,7 @@
     }
 
     function runPostBootChoreography() {
-        // 1. Freeze the SVG on its exact final frame (2.45s)
+        // Freeze SVG on final frame
         if (brandHeader) {
             brandHeader.classList.add("svg-frozen");
             brandHeader.classList.remove("state-booting");
@@ -85,17 +91,17 @@
             svgElement.pauseAnimations();
         }
 
-        // 2. Slowly dissolve the black curtain (2.8s)
+        // Dissolve black curtain
         if (curtain) {
             curtain.classList.add("fade-away");
         }
 
-        // 3. Unfold the centered widget box along the X-axis (starts 750ms into the header glide)
+        // Unfold widget box along X-axis
         setTimeout(() => {
             if (appGrid) appGrid.classList.add("box-open-x");
         }, 750);
 
-        // 4. Cascade icons inside the box from top to bottom as the X-expansion settles
+        // Cascade icons top-to-bottom
         setTimeout(() => {
             if (typeof window.recalculateTopToBottomStagger === "function") {
                 window.recalculateTopToBottomStagger();
@@ -105,5 +111,6 @@
         }, 1680);
     }
 
-    window.addEventListener("DOMContentLoaded", loadAndStartBoot);
+    // Trigger initialization immediately when DOM is parsed
+    window.addEventListener("DOMContentLoaded", initBootSequence);
 })();

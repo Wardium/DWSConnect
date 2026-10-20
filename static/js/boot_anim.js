@@ -29,12 +29,11 @@
     `;
 
     async function initBootSequence() {
-        // 1. Wait until boot.svg is fully fetched and injected into the DOM
+        // 1. Fetch the SVG file over the network
         try {
             const res = await fetch(BOOT_SVG_PATH);
             if (res.ok) {
-                const svgCode = await res.text();
-                container.innerHTML = svgCode;
+                container.innerHTML = await res.text();
             } else {
                 container.innerHTML = FALLBACK_SVG;
             }
@@ -44,14 +43,33 @@
 
         svgElement = container.querySelector("svg");
         if (svgElement) {
-            // Force reset any internal SVG SMIL animations to time 0
+            // Force-pause any internal SVG SMIL or CSS animations immediately upon injection
+            if (typeof svgElement.pauseAnimations === "function") {
+                svgElement.pauseAnimations();
+            }
             if (typeof svgElement.setCurrentTime === "function") {
                 svgElement.setCurrentTime(0);
             }
         }
 
-        // 2. Everything is loaded and ready: start the 60fps clock on the next paint frame
-        requestAnimationFrame(stepBootAnimation);
+        // Add a temporary class to lock all internal SVG animations paused until the JS timer starts
+        if (brandHeader) {
+            brandHeader.classList.add("waiting-to-boot");
+        }
+
+        // 2. Small safety delay to let the browser paint the injected SVG into memory while keeping the black curtain solid
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                // Remove wait lock and start the 60fps clock precisely at frame 0
+                if (brandHeader) {
+                    brandHeader.classList.remove("waiting-to-boot");
+                }
+                if (svgElement && typeof svgElement.unpauseAnimations === "function") {
+                    svgElement.unpauseAnimations();
+                }
+                requestAnimationFrame(stepBootAnimation);
+            });
+        });
     }
 
     function stepBootAnimation(timestamp) {
@@ -81,7 +99,7 @@
     }
 
     function runPostBootChoreography() {
-        // Freeze SVG on final frame
+        // 1. Freeze SVG on its exact final frame
         if (brandHeader) {
             brandHeader.classList.add("svg-frozen");
             brandHeader.classList.remove("state-booting");
@@ -91,17 +109,17 @@
             svgElement.pauseAnimations();
         }
 
-        // Dissolve black curtain
+        // 2. Dissolve the black curtain smoothly
         if (curtain) {
             curtain.classList.add("fade-away");
         }
 
-        // Unfold widget box along X-axis
+        // 3. Unfold the centered widget box along the X-axis
         setTimeout(() => {
             if (appGrid) appGrid.classList.add("box-open-x");
         }, 750);
 
-        // Cascade icons top-to-bottom
+        // 4. Cascade icons top-to-bottom
         setTimeout(() => {
             if (typeof window.recalculateTopToBottomStagger === "function") {
                 window.recalculateTopToBottomStagger();
@@ -111,6 +129,5 @@
         }, 1680);
     }
 
-    // Trigger initialization immediately when DOM is parsed
     window.addEventListener("DOMContentLoaded", initBootSequence);
 })();

@@ -28,45 +28,77 @@
         </svg>
     `;
 
+    function waitForWindowLoad() {
+        if (document.readyState === "complete") {
+            return Promise.resolve();
+        }
+        return new Promise((resolve) => window.addEventListener("load", resolve, { once: true }));
+    }
+
+    function pauseAndRewindSvg(svg) {
+        if (!svg) return;
+        // Pause & rewind SMIL <animate> tags
+        if (typeof svg.pauseAnimations === "function") svg.pauseAnimations();
+        if (typeof svg.setCurrentTime === "function") svg.setCurrentTime(0);
+
+        // Pause & rewind CSS @keyframes / Web Animations
+        if (typeof svg.getAnimations === "function") {
+            svg.getAnimations({ subtree: true }).forEach((anim) => {
+                anim.pause();
+                anim.currentTime = 0;
+            });
+        }
+    }
+
+    function unpauseAndRestartSvg(svg) {
+        if (!svg) return;
+        // Restart & unpause SMIL <animate> tags at 0.00s
+        if (typeof svg.unpauseAnimations === "function") svg.unpauseAnimations();
+        if (typeof svg.setCurrentTime === "function") svg.setCurrentTime(0);
+
+        // Restart & unpause all CSS @keyframes / Web Animations at 0.00s
+        if (typeof svg.getAnimations === "function") {
+            svg.getAnimations({ subtree: true }).forEach((anim) => {
+                anim.cancel();
+                anim.play();
+                anim.currentTime = 0;
+            });
+        }
+    }
+
     async function initBootSequence() {
-        // 1. Fetch the SVG file over the network
-        try {
-            const res = await fetch(BOOT_SVG_PATH);
-            if (res.ok) {
-                container.innerHTML = await res.text();
-            } else {
-                container.innerHTML = FALLBACK_SVG;
-            }
-        } catch (err) {
-            container.innerHTML = FALLBACK_SVG;
-        }
-
-        svgElement = container.querySelector("svg");
-        if (svgElement) {
-            // Force-pause any internal SVG SMIL or CSS animations immediately upon injection
-            if (typeof svgElement.pauseAnimations === "function") {
-                svgElement.pauseAnimations();
-            }
-            if (typeof svgElement.setCurrentTime === "function") {
-                svgElement.setCurrentTime(0);
-            }
-        }
-
-        // Add a temporary class to lock all internal SVG animations paused until the JS timer starts
         if (brandHeader) {
             brandHeader.classList.add("waiting-to-boot");
         }
 
-        // 2. Small safety delay to let the browser paint the injected SVG into memory while keeping the black curtain solid
+        // 1. Fetch boot.svg text
+        let svgCode = FALLBACK_SVG;
+        try {
+            const res = await fetch(BOOT_SVG_PATH);
+            if (res.ok) {
+                svgCode = await res.text();
+            }
+        } catch (err) {}
+
+        // 2. Inject SVG while paused and immediately rewind to frame 0
+        container.innerHTML = svgCode;
+        svgElement = container.querySelector("svg");
+        pauseAndRewindSvg(svgElement);
+
+        // 3. Wait until the entire website, window.load, settings API, and background image are 100% loaded
+        await Promise.all([
+            waitForWindowLoad(),
+            window.dashboardReadyPromise || Promise.resolve(),
+            document.fonts ? document.fonts.ready : Promise.resolve()
+        ]);
+
+        // 4. Let the browser settle for 2 paint frames, then unpause and start from 0.00s
         requestAnimationFrame(() => {
             requestAnimationFrame(() => {
-                // Remove wait lock and start the 60fps clock precisely at frame 0
                 if (brandHeader) {
                     brandHeader.classList.remove("waiting-to-boot");
                 }
-                if (svgElement && typeof svgElement.unpauseAnimations === "function") {
-                    svgElement.unpauseAnimations();
-                }
+                unpauseAndRestartSvg(svgElement);
                 requestAnimationFrame(stepBootAnimation);
             });
         });
@@ -99,14 +131,19 @@
     }
 
     function runPostBootChoreography() {
-        // 1. Freeze SVG on its exact final frame
+        // 1. Freeze SVG on its exact final frame (both CSS and SMIL)
         if (brandHeader) {
             brandHeader.classList.add("svg-frozen");
             brandHeader.classList.remove("state-booting");
             brandHeader.classList.add("state-docked");
         }
-        if (svgElement && typeof svgElement.pauseAnimations === "function") {
-            svgElement.pauseAnimations();
+        if (svgElement) {
+            if (typeof svgElement.pauseAnimations === "function") {
+                svgElement.pauseAnimations();
+            }
+            if (typeof svgElement.getAnimations === "function") {
+                svgElement.getAnimations({ subtree: true }).forEach((anim) => anim.pause());
+            }
         }
 
         // 2. Dissolve the black curtain smoothly
@@ -129,5 +166,5 @@
         }, 1680);
     }
 
-    window.addEventListener("DOMContentLoaded", initBootSequence);
+    initBootSequence();
 })();

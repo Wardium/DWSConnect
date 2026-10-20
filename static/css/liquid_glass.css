@@ -729,3 +729,10 @@ body, html {
         padding: 14px 16px;
     }
 }
+
+
+/* Keeps custom SVG animations frozen until JS officially starts the timeline at frame 0 */
+#brand-header.waiting-to-boot svg,
+#brand-header.waiting-to-boot svg * {
+    animation-play-state: paused !important;
+}

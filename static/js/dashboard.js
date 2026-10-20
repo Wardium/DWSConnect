@@ -17,27 +17,50 @@
     const settingsAppList = document.getElementById("settings-app-list");
 
     let serverState = { background: {}, apps: [] };
+    let resolveDashboardReady;
+    window.dashboardReadyPromise = new Promise((resolve) => {
+        resolveDashboardReady = resolve;
+    });
 
     async function loadServerState() {
-        const res = await fetch("/api/settings");
-        serverState = await res.json();
-        renderBackground(serverState.background);
-        renderAppGrid(serverState.apps);
-        renderSettingsAppList(serverState.apps);
-    }
-
-    function renderBackground(bg) {
-        if (bg && bg.url) {
-            customBgImg.src = bg.url;
-            customBgImg.classList.remove("hidden");
-            defaultSvg.classList.add("hidden");
-        } else {
-            customBgImg.classList.add("hidden");
-            defaultSvg.classList.remove("hidden");
+        try {
+            const res = await fetch("/api/settings");
+            serverState = await res.json();
+            await renderBackground(serverState.background);
+            renderAppGrid(serverState.apps);
+            renderSettingsAppList(serverState.apps);
+        } catch (err) {
+            console.error("[DASHBOARD] Failed loading settings:", err);
+        } finally {
+            resolveDashboardReady();
         }
     }
 
-// Assigns slower, smoother top-to-bottom stagger delays based on Y row coordinates
+    function renderBackground(bg) {
+        return new Promise((resolve) => {
+            if (bg && bg.url) {
+                customBgImg.onload = async () => {
+                    if (typeof customBgImg.decode === "function") {
+                        try { await customBgImg.decode(); } catch (e) {}
+                    }
+                    customBgImg.classList.remove("hidden");
+                    defaultSvg.classList.add("hidden");
+                    resolve();
+                };
+                customBgImg.onerror = () => {
+                    customBgImg.classList.add("hidden");
+                    defaultSvg.classList.remove("hidden");
+                    resolve();
+                };
+                customBgImg.src = bg.url;
+            } else {
+                customBgImg.classList.add("hidden");
+                defaultSvg.classList.remove("hidden");
+                resolve();
+            }
+        });
+    }
+
     window.recalculateTopToBottomStagger = function () {
         const widgets = Array.from(appGrid.querySelectorAll(".app-widget"));
         if (!widgets.length) return;
@@ -46,7 +69,6 @@
 
         widgets.forEach((widget, idx) => {
             const rowIndex = rowTops.indexOf(widget.offsetTop);
-            // 150ms per vertical row + 35ms gentle horizontal wave
             const delayMs = rowIndex * 150 + (idx % 6) * 35;
             widget.style.setProperty("--stagger-delay", `${delayMs}ms`);
         });
@@ -113,7 +135,7 @@
             iframeStage.classList.add("hidden");
             iframeWindow.classList.remove("closing");
             appIframe.src = "about:blank";
-        }, 320);
+        }, 480);
     }
 
     iframeClose.addEventListener("click", closeIframeModal);
@@ -150,7 +172,7 @@
         if (res.ok) {
             const data = await res.json();
             serverState.background = data.background;
-            renderBackground(serverState.background);
+            await renderBackground(serverState.background);
             bgForm.reset();
         }
     });

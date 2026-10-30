@@ -1,111 +1,112 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#050811">
     <title>DWSConnect</title>
-    <link rel="stylesheet" href="/static/css/liquid_glass.css" />
+    <link rel="stylesheet" href="/static/css/liquid_glass.css">
 </head>
 <body>
     <!-- 1. SEAMLESS INTRO CURTAIN & FLOATING SVG HEADER -->
     <div id="boot-curtain"></div>
-    <header id="brand-header" class="state-booting waiting-to-boot">
+    <header id="brand-header" class="state-booting">
         <div id="boot-svg-container"></div>
     </header>
 
     <!-- 2. PARALLAX BACKGROUND ENGINE -->
     <div id="parallax-viewport">
-        <div class="parallax-layer" data-depth="0.04">
+        <div class="parallax-layer" data-depth="0.03">
             <svg id="default-bg-svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
                 <defs>
                     <radialGradient id="orbGrad1" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.42" />
-                        <stop offset="100%" stop-color="#0f172a" stop-opacity="0" />
+                        <stop offset="0%" stop-color="rgba(56, 189, 248, 0.42)"/>
+                        <stop offset="100%" stop-color="rgba(56, 189, 248, 0)"/>
                     </radialGradient>
                     <radialGradient id="orbGrad2" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.38" />
-                        <stop offset="100%" stop-color="#0f172a" stop-opacity="0" />
+                        <stop offset="0%" stop-color="rgba(168, 85, 247, 0.36)"/>
+                        <stop offset="100%" stop-color="rgba(168, 85, 247, 0)"/>
                     </radialGradient>
                     <radialGradient id="orbGrad3" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.3" />
-                        <stop offset="100%" stop-color="#0f172a" stop-opacity="0" />
+                        <stop offset="0%" stop-color="rgba(59, 130, 246, 0.30)"/>
+                        <stop offset="100%" stop-color="rgba(59, 130, 246, 0)"/>
                     </radialGradient>
                 </defs>
-                <rect width="1920" height="1080" fill="#050811" />
-                <circle id="svg-orb-1" cx="550" cy="380" r="520" fill="url(#orbGrad1)" />
-                <circle id="svg-orb-2" cx="1350" cy="700" r="580" fill="url(#orbGrad2)" />
-                <circle id="svg-orb-3" cx="960" cy="540" r="460" fill="url(#orbGrad3)" />
+                <rect width="1920" height="1080" fill="#050811"/>
+                <circle id="svg-orb-1" cx="550" cy="380" r="460" fill="url(#orbGrad1)"/>
+                <circle id="svg-orb-2" cx="1350" cy="700" r="520" fill="url(#orbGrad2)"/>
+                <circle id="svg-orb-3" cx="960" cy="540" r="420" fill="url(#orbGrad3)"/>
             </svg>
-            <img id="custom-bg-img" class="hidden" alt="Background" decoding="async" />
+            <img id="custom-bg-img" class="hidden" alt="Background" decoding="sync" loading="eager">
         </div>
-        <div class="parallax-layer ambient-grid" data-depth="0.08"></div>
+        <div class="parallax-layer ambient-grid" data-depth="0.06"></div>
     </div>
 
     <!-- 3. THREE-SECTION WORKSPACE -->
     <main id="workspace">
-        <!-- LEFT SECTION: MULTI-SERVER DRIVE & FILE VIEWER -->
-        <section id="file-viewer-panel" class="liquid-side-panel side-panel-left">
+        <!-- LEFT SECTION: MULTI-SERVER DRIVE & FILE EXPLORER -->
+        <aside id="left-file-panel" class="side-glass-panel">
             <div class="panel-header">
                 <div class="panel-title-group">
-                    <span class="status-dot-pulse"></span>
-                    <h2>Server Drives</h2>
-                    <span id="drive-count-badge" class="glass-badge">0 Disks</span>
+                    <span class="status-dot online" id="fleet-status-dot"></span>
+                    <h2>DWS Fleet Storage</h2>
                 </div>
                 <div class="panel-actions">
-                    <button id="drives-refresh-btn" class="glass-icon-btn" title="Scan Drives Now">↻</button>
+                    <button id="refresh-drives-btn" class="icon-glass-btn" title="Scan Drives Now">↻</button>
                 </div>
             </div>
 
-            <!-- Breadcrumb & File Action Bar (Visible when browsing a disk) -->
-            <div id="file-browser-toolbar" class="file-toolbar hidden">
-                <div class="file-nav-row">
-                    <button id="file-back-btn" class="glass-mini-btn" title="Back">←</button>
-                    <button id="file-home-btn" class="glass-mini-btn" title="All Drives">Drives</button>
-                    <div id="file-breadcrumbs" class="file-breadcrumbs"></div>
+            <!-- Server Health Strip -->
+            <div id="server-health-strip" class="server-health-strip"></div>
+
+            <!-- Breadcrumb / Active Drive Toolbar (shown when browsing a disk) -->
+            <div id="file-browser-toolbar" class="file-browser-toolbar hidden">
+                <div class="toolbar-top-row">
+                    <button id="back-to-drives-btn" class="mini-glass-btn" title="All Drives">← Drives</button>
+                    <button id="dir-up-btn" class="mini-glass-btn" title="Up One Folder">↑ Up</button>
+                    <span id="current-path-label" class="current-path-label">/</span>
                 </div>
-                <div class="file-action-row">
-                    <input type="text" id="file-filter-input" class="glass-input-sm" placeholder="Filter files..." />
-                    <button id="file-mkdir-btn" class="glass-mini-btn" title="New Folder">+ Folder</button>
-                    <label class="glass-mini-btn accent-btn" title="Upload Files to Current Disk">
-                        ↑ Upload
-                        <input type="file" id="file-upload-input" multiple hidden />
-                    </label>
-                </div>
-                <div id="upload-progress-bar" class="upload-progress hidden">
-                    <div id="upload-progress-fill"></div>
-                    <span id="upload-progress-text">Uploading...</span>
+                <div class="toolbar-action-row">
+                    <input type="text" id="file-search-input" class="glass-input mini-search" placeholder="Filter files...">
+                    <button id="new-folder-btn" class="mini-glass-btn" title="New Folder">+ Folder</button>
+                    <button id="upload-trigger-btn" class="mini-glass-btn accent-btn" title="Upload to this disk">↑ Upload</button>
+                    <input type="file" id="remote-file-upload-input" multiple class="hidden">
                 </div>
             </div>
 
-            <!-- Drag & Drop Overlay -->
-            <div id="file-drop-zone" class="panel-scroll-body">
+            <!-- Scrollable Content: Either the 8+ Drives List OR Directory Contents -->
+            <div id="file-explorer-body" class="panel-scroll-body">
                 <div id="drives-list-container" class="drives-list"></div>
-                <div id="files-list-container" class="files-list hidden"></div>
+                <div id="directory-list-container" class="directory-list hidden"></div>
             </div>
-        </section>
 
-        <!-- MIDDLE SECTION: EXISTING LIQUID GLASS APP LAUNCHER -->
-        <section id="center-column">
-            <div class="center-search-bar ui-chrome" id="center-search-wrap">
-                <input type="text" id="app-search-input" class="glass-search-input" placeholder="Search apps... (Press / to focus)" />
+            <!-- Drag & Drop Upload Overlay -->
+            <div id="drop-upload-overlay" class="drop-upload-overlay hidden">
+                <div class="drop-box-inner">Drop files to upload to active disk</div>
+            </div>
+        </aside>
+
+        <!-- MIDDLE SECTION: EXISTING APP GRID (UNCHANGED CORE + QUICK SEARCH QoL) -->
+        <section id="center-stage-column">
+            <div id="center-search-bar" class="center-search-bar ui-chrome">
+                <input type="text" id="app-quick-filter" class="glass-input" placeholder="Quick launch app... (Press / to focus)">
             </div>
             <div id="app-grid" class="liquid-grid"></div>
         </section>
 
         <!-- RIGHT SECTION: MODULAR LIVE NOTIFICATION CENTER -->
-        <section id="notification-panel" class="liquid-side-panel side-panel-right">
+        <aside id="right-notif-panel" class="side-glass-panel">
             <div class="panel-header">
                 <div class="panel-title-group">
-                    <h2>Notifications</h2>
-                    <span id="notif-count-badge" class="glass-badge">2 Live</span>
+                    <h2>Live Telemetry & Alerts</h2>
+                    <span id="notif-count-badge" class="notif-badge">2</span>
                 </div>
                 <div class="panel-actions">
-                    <button id="notif-test-btn" class="glass-mini-btn" title="Spawn Demo Timer Notification">+ Timer</button>
-                    <button id="notif-clear-btn" class="glass-mini-btn" title="Clear Dismissible Notifications">Clear</button>
+                    <button id="clear-transient-notifs-btn" class="mini-glass-btn" title="Clear dismissible alerts">Clear</button>
                 </div>
             </div>
-            <div id="notification-list" class="panel-scroll-body notif-stack"></div>
-        </section>
+            <div id="notification-stream" class="panel-scroll-body notification-stream"></div>
+        </aside>
     </main>
 
     <!-- 4. EXPANDING LIQUID GLASS IFRAME STAGE -->
@@ -114,76 +115,76 @@
             <div class="iframe-header">
                 <span id="iframe-title">Application</span>
                 <div style="display:flex; gap:8px; align-items:center;">
-                    <button id="iframe-reload" class="glass-mini-btn" title="Reload Frame">↻</button>
-                    <button id="iframe-external" class="glass-mini-btn" title="Open in New Tab">↗</button>
+                    <button id="iframe-open-tab" class="mini-glass-btn" title="Open in New Tab">↗ Tab</button>
                     <button id="iframe-close" class="liquid-close-btn" title="Close (Esc)">✕</button>
                 </div>
             </div>
-            <iframe id="app-iframe" src="about:blank" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
+            <iframe id="app-iframe" src="about:blank" allowfullscreen></iframe>
         </div>
     </div>
 
-    <!-- 5. FLOATING SETTINGS PILL & MODAL -->
-    <button id="settings-trigger" class="liquid-glass-pill ui-chrome">
-        <span>⚙</span>
-        <span>Customize</span>
-    </button>
+    <!-- 5. FLOATING DOCK CONTROLS & SETTINGS MODAL -->
+    <div class="floating-controls-dock">
+        <button id="toggle-panels-btn" class="liquid-glass-pill ui-chrome" title="Toggle Side Panels ([)">
+            <span>⇄ Panels</span>
+        </button>
+        <button id="settings-trigger" class="liquid-glass-pill ui-chrome">
+            <span>⚙ Settings</span>
+        </button>
+    </div>
 
     <div id="settings-modal" class="modal-backdrop hidden">
         <div class="liquid-glass-modal">
             <div class="modal-header">
-                <h2>DWSConnect Settings</h2>
+                <h2>Workspace Settings</h2>
                 <button id="settings-close" class="liquid-close-btn">✕</button>
             </div>
             <div class="modal-body">
-                <form id="add-app-form" class="glass-card">
-                    <h3>Add New App</h3>
-                    <div class="form-grid">
+                <div class="glass-card">
+                    <h3>Add Application</h3>
+                    <form id="add-app-form" class="form-grid">
                         <div class="form-row">
                             <label>App Name</label>
-                            <input type="text" name="name" class="glass-input" placeholder="e.g. Jellyfin" required />
+                            <input type="text" name="name" class="glass-input" placeholder="Jellyfin" required>
                         </div>
                         <div class="form-row">
                             <label>App URL</label>
-                            <input type="text" name="url" class="glass-input" placeholder="https://..." required />
+                            <input type="url" name="url" class="glass-input" placeholder="https://..." required>
                         </div>
-                    </div>
-                    <div class="form-row">
-                        <label>Custom Icon (Optional)</label>
-                        <input type="file" name="icon" class="glass-file-input" accept="image/*" />
-                    </div>
-                    <label class="glass-toggle-row">
-                        <input type="checkbox" id="iframe-toggle" name="iframe" checked />
-                        <span class="glass-toggle-slider"></span>
-                        <span class="glass-toggle-label">Open inside Liquid Glass Iframe</span>
-                    </label>
-                    <button type="submit" class="liquid-submit-btn">Add App Widget</button>
-                </form>
-
-                <form id="bg-form" class="glass-card">
-                    <h3>Custom Wallpaper</h3>
-                    <div class="form-row">
-                        <label>Upload Background Image (Leave empty to reset to animated SVG)</label>
-                        <input type="file" name="background" class="glass-file-input" accept="image/*" />
-                    </div>
-                    <div style="display:flex; gap:8px;">
-                        <button type="submit" class="liquid-submit-btn" style="flex:1;">Save Background</button>
-                        <button type="button" id="replay-boot-btn" class="liquid-submit-btn" title="Replay Full Intro on Next Refresh">Replay Intro</button>
-                    </div>
-                </form>
+                        <div class="form-row" style="grid-column: span 2;">
+                            <label>Custom Icon (Optional)</label>
+                            <input type="file" name="icon" class="glass-file-input" accept=".png,.svg,.jpg,.jpeg,.webp,.gif">
+                        </div>
+                        <label class="glass-toggle-row" style="grid-column: span 2;">
+                            <input type="checkbox" id="iframe-toggle" checked>
+                            <span class="glass-toggle-slider"></span>
+                            <span class="glass-toggle-label">Open inside Liquid Glass Iframe</span>
+                        </label>
+                        <button type="submit" class="liquid-submit-btn" style="grid-column: span 2;">Add App Widget</button>
+                    </form>
+                </div>
 
                 <div class="glass-card">
-                    <h3>Installed Apps</h3>
+                    <h3>Custom Background</h3>
+                    <form id="bg-form" style="display:flex; flex-direction:column; gap:10px;">
+                        <input type="file" name="background" class="glass-file-input" accept=".png,.svg,.jpg,.jpeg,.webp,.gif">
+                        <div style="display:flex; gap:8px;">
+                            <button type="submit" class="liquid-submit-btn" style="flex:1;">Save Background</button>
+                            <button type="button" id="replay-boot-btn" class="mini-glass-btn">Replay Intro</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="glass-card">
+                    <h3>Installed Applications</h3>
                     <div id="settings-app-list" class="settings-app-list"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="/static/js/notifications.js"></script>
     <script src="/static/js/parallax.js"></script>
     <script src="/static/js/dashboard.js"></script>
-    <script src="/static/js/file_viewer.js"></script>
     <script src="/static/js/boot_anim.js"></script>
 </body>
 </html>

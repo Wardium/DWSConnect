@@ -1,11 +1,23 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <meta name="theme-color" content="#050811">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#050811" />
     <title>DWSConnect</title>
-    <link rel="stylesheet" href="/static/css/liquid_glass.css">
+    <!-- Inline dark lock prevents white compositor flash on tab restore -->
+    <style>
+        html, body {
+            background-color: #050811 !important;
+            color: #ffffff;
+            color-scheme: dark;
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+        }
+    </style>
+    <link rel="stylesheet" href="/static/css/liquid_glass.css" />
 </head>
 <body>
     <!-- 1. SEAMLESS INTRO CURTAIN & FLOATING SVG HEADER -->
@@ -20,171 +32,206 @@
             <svg id="default-bg-svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
                 <defs>
                     <radialGradient id="orbGrad1" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="rgba(56, 189, 248, 0.42)"/>
-                        <stop offset="100%" stop-color="rgba(56, 189, 248, 0)"/>
+                        <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.42" />
+                        <stop offset="100%" stop-color="#050811" stop-opacity="0" />
                     </radialGradient>
                     <radialGradient id="orbGrad2" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="rgba(168, 85, 247, 0.36)"/>
-                        <stop offset="100%" stop-color="rgba(168, 85, 247, 0)"/>
+                        <stop offset="0%" stop-color="#a855f7" stop-opacity="0.36" />
+                        <stop offset="100%" stop-color="#050811" stop-opacity="0" />
                     </radialGradient>
                     <radialGradient id="orbGrad3" cx="50%" cy="50%" r="50%">
-                        <stop offset="0%" stop-color="rgba(59, 130, 246, 0.30)"/>
-                        <stop offset="100%" stop-color="rgba(59, 130, 246, 0)"/>
+                        <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.32" />
+                        <stop offset="100%" stop-color="#050811" stop-opacity="0" />
                     </radialGradient>
                 </defs>
-                <rect width="1920" height="1080" fill="#050811"/>
-                <circle id="svg-orb-1" cx="550" cy="380" r="460" fill="url(#orbGrad1)"/>
-                <circle id="svg-orb-2" cx="1350" cy="700" r="520" fill="url(#orbGrad2)"/>
-                <circle id="svg-orb-3" cx="960" cy="540" r="420" fill="url(#orbGrad3)"/>
+                <rect width="1920" height="1080" fill="#050811" />
+                <circle id="svg-orb-1" cx="550" cy="380" r="520" fill="url(#orbGrad1)" />
+                <circle id="svg-orb-2" cx="1350" cy="700" r="560" fill="url(#orbGrad2)" />
+                <circle id="svg-orb-3" cx="960" cy="540" r="460" fill="url(#orbGrad3)" />
             </svg>
-            <img id="custom-bg-img" class="hidden" alt="Background" decoding="sync" loading="eager">
+            <img id="custom-bg-img" class="hidden" alt="Background" decoding="sync" />
         </div>
         <div class="parallax-layer ambient-grid" data-depth="0.06"></div>
     </div>
 
-    <!-- 3. THREE-SECTION WORKSPACE -->
+    <!-- 3. THREE-COLUMN WORKSPACE -->
     <main id="workspace">
-        <!-- LEFT SECTION: MULTI-SERVER DRIVE & FILE EXPLORER -->
-        <aside id="left-file-panel" class="side-glass-panel">
+        <!-- LEFT SECTION: MULTI-SERVER DRIVE & SFTP FILE VIEWER -->
+        <aside id="left-file-panel" class="liquid-side-panel">
             <div class="panel-header">
                 <div class="panel-title-group">
-                    <span class="status-dot online" id="fleet-status-dot"></span>
-                    <h2>DWS Fleet Storage</h2>
+                    <span class="status-dot-pulse" id="drives-status-dot"></span>
+                    <h2 id="file-panel-title">Server Drives</h2>
+                    <span class="glass-badge" id="drives-count-badge">0 Disks</span>
                 </div>
                 <div class="panel-actions">
-                    <button id="refresh-drives-btn" class="icon-glass-btn" title="Scan Drives Now">↻</button>
+                    <button class="glass-icon-btn hidden" id="btn-back-to-drives" title="Back to All Drives">
+                        All Drives
+                    </button>
+                    <button class="glass-icon-btn" id="btn-refresh-files" title="Rescan Drives / Refresh">
+                        ↻
+                    </button>
                 </div>
             </div>
 
-            <!-- Server Health Strip -->
-            <div id="server-health-strip" class="server-health-strip"></div>
-
-            <!-- Breadcrumb / Active Drive Toolbar (shown when browsing a disk) -->
-            <div id="file-browser-toolbar" class="file-browser-toolbar hidden">
-                <div class="toolbar-top-row">
-                    <button id="back-to-drives-btn" class="mini-glass-btn" title="All Drives">← Drives</button>
-                    <button id="dir-up-btn" class="mini-glass-btn" title="Up One Folder">↑ Up</button>
-                    <span id="current-path-label" class="current-path-label">/</span>
-                </div>
-                <div class="toolbar-action-row">
-                    <input type="text" id="file-search-input" class="glass-input mini-search" placeholder="Filter files...">
-                    <button id="new-folder-btn" class="mini-glass-btn" title="New Folder">+ Folder</button>
-                    <button id="upload-trigger-btn" class="mini-glass-btn accent-btn" title="Upload to this disk">↑ Upload</button>
-                    <input type="file" id="remote-file-upload-input" multiple class="hidden">
-                </div>
+            <!-- Server Quick SSH Shell Bar -->
+            <div class="server-shell-bar" id="server-shell-bar">
+                <span class="shell-bar-label">SSH Shell:</span>
+                <button class="glass-pill-btn" data-shell-id="1" title="Open Server 1 SSH Terminal">Srv 1</button>
+                <button class="glass-pill-btn" data-shell-id="2" title="Open Server 2 SSH Terminal">Srv 2</button>
+                <button class="glass-pill-btn" data-shell-id="3" title="Open Server 3 (Pi) SSH Terminal">Srv 3 (Pi)</button>
             </div>
 
-            <!-- Scrollable Content: Either the 8+ Drives List OR Directory Contents -->
-            <div id="file-explorer-body" class="panel-scroll-body">
-                <div id="drives-list-container" class="drives-list"></div>
-                <div id="directory-list-container" class="directory-list hidden"></div>
+            <!-- View A: All Connected Drives List -->
+            <div id="drives-list-view" class="panel-scroll-body">
+                <div class="panel-empty-state">Scanning SSH servers for connected disks...</div>
             </div>
 
-            <!-- Drag & Drop Upload Overlay -->
-            <div id="drop-upload-overlay" class="drop-upload-overlay hidden">
-                <div class="drop-box-inner">Drop files to upload to active disk</div>
+            <!-- View B: Active Disk File Browser -->
+            <div id="file-browser-view" class="panel-flex-body hidden">
+                <div class="browser-toolbar">
+                    <div class="breadcrumb-bar" id="file-breadcrumbs"></div>
+                    <div class="browser-action-row">
+                        <input type="text" id="file-filter-input" class="glass-mini-input" placeholder="Filter folder..." />
+                        <button class="glass-action-btn" id="btn-new-folder" title="New Folder">+ Folder</button>
+                        <button class="glass-action-btn primary" id="btn-upload-trigger" title="Upload files to current directory">↑ Upload</button>
+                        <input type="file" id="hidden-file-upload" multiple class="hidden" />
+                    </div>
+                </div>
+
+                <!-- Drag & Drop Overlay + Scrollable Directory Listing -->
+                <div id="file-list-container" class="panel-scroll-body" data-dropzone="true">
+                    <div id="file-items-list"></div>
+                </div>
+
+                <!-- Selected File Footer Action Bar -->
+                <div id="file-selection-bar" class="file-selection-bar hidden">
+                    <div class="selected-file-name" id="selected-file-label">No file selected</div>
+                    <div class="selected-file-actions">
+                        <button class="glass-action-btn primary" id="btn-download-selected">↓ Download</button>
+                        <button class="glass-action-btn danger" id="btn-delete-selected" title="Delete">✕</button>
+                    </div>
+                </div>
             </div>
         </aside>
 
-        <!-- MIDDLE SECTION: EXISTING APP GRID (UNCHANGED CORE + QUICK SEARCH QoL) -->
-        <section id="center-stage-column">
-            <div id="center-search-bar" class="center-search-bar ui-chrome">
-                <input type="text" id="app-quick-filter" class="glass-input" placeholder="Quick launch app... (Press / to focus)">
+        <!-- CENTER SECTION: EXISTING APP GRID + QUICK SEARCH -->
+        <section id="center-column">
+            <div class="center-search-bar">
+                <input
+                    type="text"
+                    id="app-search-input"
+                    class="glass-search-input"
+                    placeholder="Search apps or press '/' to filter..."
+                    autocomplete="off"
+                />
             </div>
-            <div id="app-grid" class="liquid-grid"></div>
+
+            <div id="app-grid"></div>
         </section>
 
-        <!-- RIGHT SECTION: MODULAR LIVE NOTIFICATION CENTER -->
-        <aside id="right-notif-panel" class="side-glass-panel">
+        <!-- RIGHT SECTION: MODULAR LIVE NOTIFICATION AREA -->
+        <aside id="right-notif-panel" class="liquid-side-panel">
             <div class="panel-header">
                 <div class="panel-title-group">
-                    <h2>Live Telemetry & Alerts</h2>
-                    <span id="notif-count-badge" class="notif-badge">2</span>
+                    <span class="status-dot-pulse"></span>
+                    <h2>Notifications</h2>
+                    <span class="glass-badge" id="notif-count-badge">2 Live</span>
                 </div>
                 <div class="panel-actions">
-                    <button id="clear-transient-notifs-btn" class="mini-glass-btn" title="Clear dismissible alerts">Clear</button>
+                    <button class="glass-icon-btn" id="btn-test-error" title="Simulate Error Notification">! Test</button>
+                    <button class="glass-icon-btn" id="btn-clear-notifs" title="Clear Dismissible Notifications">Clear</button>
                 </div>
             </div>
-            <div id="notification-stream" class="panel-scroll-body notification-stream"></div>
+
+            <!-- Filter Tabs -->
+            <div class="notif-filter-bar">
+                <button class="notif-tab active" data-filter="all">All</button>
+                <button class="notif-tab" data-filter="live">Live Modules</button>
+                <button class="notif-tab" data-filter="error">Errors</button>
+            </div>
+
+            <!-- Pinned Live Notifications + Scrollable Feed -->
+            <div id="notif-scroll-feed" class="panel-scroll-body">
+                <div id="notif-pinned-section" class="notif-section-stack"></div>
+                <div id="notif-dynamic-section" class="notif-section-stack"></div>
+            </div>
         </aside>
     </main>
 
-    <!-- 4. EXPANDING LIQUID GLASS IFRAME STAGE -->
-    <div id="iframe-Stage" class="iframe-stage hidden">
-        <div id="iframe-window" class="liquid-glass-window">
+    <!-- FLOATING BOTTOM-RIGHT SETTINGS BUTTON -->
+    <button id="settings-trigger" title="Dashboard Settings (Ctrl+,)">⚙</button>
+
+    <!-- IFRAME APP / TERMINAL STAGE MODAL -->
+    <div id="iframe-Stage" class="hidden">
+        <div id="iframe-window">
             <div class="iframe-header">
                 <span id="iframe-title">Application</span>
-                <div style="display:flex; gap:8px; align-items:center;">
-                    <button id="iframe-open-tab" class="mini-glass-btn" title="Open in New Tab">↗ Tab</button>
+                <div class="iframe-controls">
+                    <button id="iframe-reload" class="glass-icon-btn" title="Reload Frame">↻</button>
+                    <button id="iframe-ext" class="glass-icon-btn" title="Open in New Tab">↗</button>
                     <button id="iframe-close" class="liquid-close-btn" title="Close (Esc)">✕</button>
                 </div>
             </div>
-            <iframe id="app-iframe" src="about:blank" allowfullscreen></iframe>
+            <iframe id="app-iframe" src="about:blank" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
         </div>
     </div>
 
-    <!-- 5. FLOATING DOCK CONTROLS & SETTINGS MODAL -->
-    <div class="floating-controls-dock">
-        <button id="toggle-panels-btn" class="liquid-glass-pill ui-chrome" title="Toggle Side Panels ([)">
-            <span>⇄ Panels</span>
-        </button>
-        <button id="settings-trigger" class="liquid-glass-pill ui-chrome">
-            <span>⚙ Settings</span>
-        </button>
-    </div>
-
+    <!-- SETTINGS MODAL -->
     <div id="settings-modal" class="modal-backdrop hidden">
-        <div class="liquid-glass-modal">
+        <div class="liquid-modal-card">
             <div class="modal-header">
-                <h2>Workspace Settings</h2>
-                <button id="settings-close" class="liquid-close-btn">✕</button>
+                <h3>DWSConnect Settings</h3>
+                <div class="panel-actions">
+                    <button id="btn-replay-boot" class="glass-icon-btn" title="Replay Intro Animation">Replay Intro</button>
+                    <button id="settings-close" class="liquid-close-btn">✕</button>
+                </div>
             </div>
+
             <div class="modal-body">
-                <div class="glass-card">
-                    <h3>Add Application</h3>
-                    <form id="add-app-form" class="form-grid">
-                        <div class="form-row">
-                            <label>App Name</label>
-                            <input type="text" name="name" class="glass-input" placeholder="Jellyfin" required>
-                        </div>
-                        <div class="form-row">
-                            <label>App URL</label>
-                            <input type="url" name="url" class="glass-input" placeholder="https://..." required>
-                        </div>
-                        <div class="form-row" style="grid-column: span 2;">
-                            <label>Custom Icon (Optional)</label>
-                            <input type="file" name="icon" class="glass-file-input" accept=".png,.svg,.jpg,.jpeg,.webp,.gif">
-                        </div>
-                        <label class="glass-toggle-row" style="grid-column: span 2;">
-                            <input type="checkbox" id="iframe-toggle" checked>
-                            <span class="glass-toggle-slider"></span>
-                            <span class="glass-toggle-label">Open inside Liquid Glass Iframe</span>
-                        </label>
-                        <button type="submit" class="liquid-submit-btn" style="grid-column: span 2;">Add App Widget</button>
-                    </form>
-                </div>
+                <form id="add-app-form" class="glass-form">
+                    <h4>Add Application</h4>
+                    <input type="text" name="name" placeholder="App Name (e.g. Jellyfin)" required />
+                    <input type="url" name="url" placeholder="https://..." required />
+                    <input type="text" name="icon_url" placeholder="Icon URL (optional)" />
+                    <label class="file-label">
+                        <span>Or Upload Icon:</span>
+                        <input type="file" name="icon_file" accept=".png,.svg,.jpg,.jpeg,.webp,.gif" />
+                    </label>
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="iframe-toggle" name="iframe" checked />
+                        <span>Launch inside embedded window (Iframe)</span>
+                    </label>
+                    <button type="submit" class="glass-submit-btn">Add App</button>
+                </form>
 
-                <div class="glass-card">
-                    <h3>Custom Background</h3>
-                    <form id="bg-form" style="display:flex; flex-direction:column; gap:10px;">
-                        <input type="file" name="background" class="glass-file-input" accept=".png,.svg,.jpg,.jpeg,.webp,.gif">
-                        <div style="display:flex; gap:8px;">
-                            <button type="submit" class="liquid-submit-btn" style="flex:1;">Save Background</button>
-                            <button type="button" id="replay-boot-btn" class="mini-glass-btn">Replay Intro</button>
-                        </div>
-                    </form>
-                </div>
+                <div class="settings-divider"></div>
 
-                <div class="glass-card">
-                    <h3>Installed Applications</h3>
-                    <div id="settings-app-list" class="settings-app-list"></div>
-                </div>
+                <form id="bg-form" class="glass-form">
+                    <h4>Workspace Background</h4>
+                    <input type="text" name="bg_url" placeholder="Custom Image URL (optional)" />
+                    <label class="file-label">
+                        <span>Or Upload Image:</span>
+                        <input type="file" name="bg_file" accept=".png,.svg,.jpg,.jpeg,.webp,.gif" />
+                    </label>
+                    <div class="form-row-btns">
+                        <button type="submit" class="glass-submit-btn">Apply Background</button>
+                        <button type="button" id="btn-reset-bg" class="glass-action-btn">Use Default Orbs</button>
+                    </div>
+                </form>
+
+                <div class="settings-divider"></div>
+
+                <h4>Installed Apps</h4>
+                <div id="settings-app-list" class="settings-app-list"></div>
             </div>
         </div>
     </div>
 
+    <script src="/static/js/notifications.js"></script>
     <script src="/static/js/parallax.js"></script>
     <script src="/static/js/dashboard.js"></script>
+    <script src="/static/js/file_viewer.js"></script>
     <script src="/static/js/boot_anim.js"></script>
 </body>
 </html>

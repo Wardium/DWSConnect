@@ -1,145 +1,189 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <title>Liquid Glass Core</title>
-    <!-- Preload boot SVG instantly -->
-    <link rel="preload" href="/static/assets/boot.svg" as="fetch" crossorigin>
-    <link rel="stylesheet" href="/static/css/liquid_glass.css">
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>DWSConnect</title>
+    <link rel="stylesheet" href="/static/css/liquid_glass.css" />
 </head>
 <body>
-
-    <!-- Black curtain that slowly fades away after 2.45s -->
+    <!-- 1. SEAMLESS INTRO CURTAIN & FLOATING SVG HEADER -->
     <div id="boot-curtain"></div>
-
-    <!-- Persistent SVG container: starts centered for 2.45s, freezes, then shrinks into the top header -->
     <header id="brand-header" class="state-booting waiting-to-boot">
         <div id="boot-svg-container"></div>
     </header>
 
-    <!-- Multi-Layer Parallax Background (SVG / PNG) -->
+    <!-- 2. PARALLAX BACKGROUND ENGINE -->
     <div id="parallax-viewport">
-        <div id="parallax-bg-layer" class="parallax-layer" data-depth="0.04">
-            <svg id="default-bg-svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice">
+        <div class="parallax-layer" data-depth="0.04">
+            <svg id="default-bg-svg" viewBox="0 0 1920 1080" preserveAspectRatio="xMidYMid slice" xmlns="http://www.w3.org/2000/svg">
                 <defs>
-                    <radialGradient id="orb1" cx="30%" cy="30%" r="50%">
-                        <stop offset="0%" stop-color="#3b82f6" stop-opacity="0.45"/>
-                        <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+                    <radialGradient id="orbGrad1" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.42" />
+                        <stop offset="100%" stop-color="#0f172a" stop-opacity="0" />
                     </radialGradient>
-                    <radialGradient id="orb2" cx="70%" cy="65%" r="50%">
-                        <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.4"/>
-                        <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+                    <radialGradient id="orbGrad2" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.38" />
+                        <stop offset="100%" stop-color="#0f172a" stop-opacity="0" />
                     </radialGradient>
-                    <radialGradient id="orb3" cx="50%" cy="20%" r="45%">
-                        <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.35"/>
-                        <stop offset="100%" stop-color="#0f172a" stop-opacity="0"/>
+                    <radialGradient id="orbGrad3" cx="50%" cy="50%" r="50%">
+                        <stop offset="0%" stop-color="#60a5fa" stop-opacity="0.3" />
+                        <stop offset="100%" stop-color="#0f172a" stop-opacity="0" />
                     </radialGradient>
                 </defs>
-                <rect width="1920" height="1080" fill="#060913"/>
-                <circle id="svg-orb-1" cx="550" cy="380" r="550" fill="url(#orb1)"/>
-                <circle id="svg-orb-2" cx="1350" cy="700" r="600" fill="url(#orb2)"/>
-                <circle id="svg-orb-3" cx="960" cy="250" r="480" fill="url(#orb3)"/>
+                <rect width="1920" height="1080" fill="#050811" />
+                <circle id="svg-orb-1" cx="550" cy="380" r="520" fill="url(#orbGrad1)" />
+                <circle id="svg-orb-2" cx="1350" cy="700" r="580" fill="url(#orbGrad2)" />
+                <circle id="svg-orb-3" cx="960" cy="540" r="460" fill="url(#orbGrad3)" />
             </svg>
-            <img id="custom-bg-img" src="" alt="Custom Background" class="hidden" />
+            <img id="custom-bg-img" class="hidden" alt="Background" decoding="async" />
         </div>
         <div class="parallax-layer ambient-grid" data-depth="0.08"></div>
     </div>
 
-    <!-- Centered App Grid Workspace -->
+    <!-- 3. THREE-SECTION WORKSPACE -->
     <main id="workspace">
-        <div id="app-grid" class="liquid-grid">
-            <!-- Populated dynamically via dashboard.js -->
-        </div>
+        <!-- LEFT SECTION: MULTI-SERVER DRIVE & FILE VIEWER -->
+        <section id="file-viewer-panel" class="liquid-side-panel side-panel-left">
+            <div class="panel-header">
+                <div class="panel-title-group">
+                    <span class="status-dot-pulse"></span>
+                    <h2>Server Drives</h2>
+                    <span id="drive-count-badge" class="glass-badge">0 Disks</span>
+                </div>
+                <div class="panel-actions">
+                    <button id="drives-refresh-btn" class="glass-icon-btn" title="Scan Drives Now">↻</button>
+                </div>
+            </div>
+
+            <!-- Breadcrumb & File Action Bar (Visible when browsing a disk) -->
+            <div id="file-browser-toolbar" class="file-toolbar hidden">
+                <div class="file-nav-row">
+                    <button id="file-back-btn" class="glass-mini-btn" title="Back">←</button>
+                    <button id="file-home-btn" class="glass-mini-btn" title="All Drives">Drives</button>
+                    <div id="file-breadcrumbs" class="file-breadcrumbs"></div>
+                </div>
+                <div class="file-action-row">
+                    <input type="text" id="file-filter-input" class="glass-input-sm" placeholder="Filter files..." />
+                    <button id="file-mkdir-btn" class="glass-mini-btn" title="New Folder">+ Folder</button>
+                    <label class="glass-mini-btn accent-btn" title="Upload Files to Current Disk">
+                        ↑ Upload
+                        <input type="file" id="file-upload-input" multiple hidden />
+                    </label>
+                </div>
+                <div id="upload-progress-bar" class="upload-progress hidden">
+                    <div id="upload-progress-fill"></div>
+                    <span id="upload-progress-text">Uploading...</span>
+                </div>
+            </div>
+
+            <!-- Drag & Drop Overlay -->
+            <div id="file-drop-zone" class="panel-scroll-body">
+                <div id="drives-list-container" class="drives-list"></div>
+                <div id="files-list-container" class="files-list hidden"></div>
+            </div>
+        </section>
+
+        <!-- MIDDLE SECTION: EXISTING LIQUID GLASS APP LAUNCHER -->
+        <section id="center-column">
+            <div class="center-search-bar ui-chrome" id="center-search-wrap">
+                <input type="text" id="app-search-input" class="glass-search-input" placeholder="Search apps... (Press / to focus)" />
+            </div>
+            <div id="app-grid" class="liquid-grid"></div>
+        </section>
+
+        <!-- RIGHT SECTION: MODULAR LIVE NOTIFICATION CENTER -->
+        <section id="notification-panel" class="liquid-side-panel side-panel-right">
+            <div class="panel-header">
+                <div class="panel-title-group">
+                    <h2>Notifications</h2>
+                    <span id="notif-count-badge" class="glass-badge">2 Live</span>
+                </div>
+                <div class="panel-actions">
+                    <button id="notif-test-btn" class="glass-mini-btn" title="Spawn Demo Timer Notification">+ Timer</button>
+                    <button id="notif-clear-btn" class="glass-mini-btn" title="Clear Dismissible Notifications">Clear</button>
+                </div>
+            </div>
+            <div id="notification-list" class="panel-scroll-body notif-stack"></div>
+        </section>
     </main>
 
-    <!-- Floating Liquid Glass Settings Trigger -->
-    <button id="settings-trigger" class="liquid-glass-pill ui-chrome" title="Server Settings">
-        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
-            <circle cx="12" cy="12" r="3"></circle>
-            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-        </svg>
-        <span>Settings</span>
-    </button>
-
-    <!-- Expanding Liquid Glass Iframe Stage -->
+    <!-- 4. EXPANDING LIQUID GLASS IFRAME STAGE -->
     <div id="iframe-Stage" class="iframe-stage hidden">
         <div id="iframe-window" class="liquid-glass-window">
             <div class="iframe-header">
                 <span id="iframe-title">Application</span>
-                <button id="iframe-close" class="liquid-close-btn" title="Close (Esc)">✕</button>
+                <div style="display:flex; gap:8px; align-items:center;">
+                    <button id="iframe-reload" class="glass-mini-btn" title="Reload Frame">↻</button>
+                    <button id="iframe-external" class="glass-mini-btn" title="Open in New Tab">↗</button>
+                    <button id="iframe-close" class="liquid-close-btn" title="Close (Esc)">✕</button>
+                </div>
             </div>
-            <iframe id="app-iframe" src="about:blank" allowfullscreen></iframe>
+            <iframe id="app-iframe" src="about:blank" allow="clipboard-read; clipboard-write; fullscreen"></iframe>
         </div>
     </div>
 
-    <!-- True Liquid Glass Settings Modal -->
+    <!-- 5. FLOATING SETTINGS PILL & MODAL -->
+    <button id="settings-trigger" class="liquid-glass-pill ui-chrome">
+        <span>⚙</span>
+        <span>Customize</span>
+    </button>
+
     <div id="settings-modal" class="modal-backdrop hidden">
         <div class="liquid-glass-modal">
             <div class="modal-header">
-                <h2>Liquid Glass Settings</h2>
+                <h2>DWSConnect Settings</h2>
                 <button id="settings-close" class="liquid-close-btn">✕</button>
             </div>
-
             <div class="modal-body">
-                <!-- Add New App Widget Form -->
                 <form id="add-app-form" class="glass-card">
-                    <h3>Add App Widget</h3>
+                    <h3>Add New App</h3>
                     <div class="form-grid">
                         <div class="form-row">
                             <label>App Name</label>
-                            <input type="text" class="glass-input" name="name" placeholder="Jellyfin, Nextcloud..." required />
+                            <input type="text" name="name" class="glass-input" placeholder="e.g. Jellyfin" required />
                         </div>
                         <div class="form-row">
-                            <label>Target URL</label>
-                            <input type="url" class="glass-input" name="url" placeholder="https://..." required />
+                            <label>App URL</label>
+                            <input type="text" name="url" class="glass-input" placeholder="https://..." required />
                         </div>
                     </div>
-                    <div class="form-grid">
-                        <div class="form-row">
-                            <label>Transparent Icon (PNG/SVG)</label>
-                            <input type="file" class="glass-file-input" name="icon_file" accept=".png,.svg,.webp,.gif" />
-                        </div>
-                        <div class="form-row">
-                            <label>Or Icon URL</label>
-                            <input type="url" class="glass-input" name="icon_url" placeholder="https://.../icon.png" />
-                        </div>
+                    <div class="form-row">
+                        <label>Custom Icon (Optional)</label>
+                        <input type="file" name="icon" class="glass-file-input" accept="image/*" />
                     </div>
-                    <label class="glass-toggle-row" for="iframe-toggle">
-                        <input type="checkbox" id="iframe-toggle" name="iframe" value="true" checked />
+                    <label class="glass-toggle-row">
+                        <input type="checkbox" id="iframe-toggle" name="iframe" checked />
                         <span class="glass-toggle-slider"></span>
-                        <span class="glass-toggle-label">Expand inside Liquid Glass Iframe</span>
+                        <span class="glass-toggle-label">Open inside Liquid Glass Iframe</span>
                     </label>
-                    <button type="submit" class="liquid-submit-btn">Add Widget</button>
+                    <button type="submit" class="liquid-submit-btn">Add App Widget</button>
                 </form>
 
-                <!-- Background Configuration -->
                 <form id="bg-form" class="glass-card">
-                    <h3>Wallpaper (SVG / PNG / WebP)</h3>
-                    <div class="form-grid">
-                        <div class="form-row">
-                            <label>Upload Wallpaper</label>
-                            <input type="file" class="glass-file-input" name="bg_file" accept=".svg,.png,.jpg,.jpeg,.webp" />
-                        </div>
-                        <div class="form-row">
-                            <label>Or Wallpaper Path/URL</label>
-                            <input type="text" class="glass-input" name="bg_url" placeholder="Blank = Default SVG" />
-                        </div>
+                    <h3>Custom Wallpaper</h3>
+                    <div class="form-row">
+                        <label>Upload Background Image (Leave empty to reset to animated SVG)</label>
+                        <input type="file" name="background" class="glass-file-input" accept="image/*" />
                     </div>
-                    <button type="submit" class="liquid-submit-btn">Update Wallpaper</button>
+                    <div style="display:flex; gap:8px;">
+                        <button type="submit" class="liquid-submit-btn" style="flex:1;">Save Background</button>
+                        <button type="button" id="replay-boot-btn" class="liquid-submit-btn" title="Replay Full Intro on Next Refresh">Replay Intro</button>
+                    </div>
                 </form>
 
-                <!-- Installed Widgets List -->
                 <div class="glass-card">
-                    <h3>Installed Widgets</h3>
+                    <h3>Installed Apps</h3>
                     <div id="settings-app-list" class="settings-app-list"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="/static/js/boot_anim.js"></script>
+    <script src="/static/js/notifications.js"></script>
     <script src="/static/js/parallax.js"></script>
     <script src="/static/js/dashboard.js"></script>
+    <script src="/static/js/file_viewer.js"></script>
+    <script src="/static/js/boot_anim.js"></script>
 </body>
 </html>

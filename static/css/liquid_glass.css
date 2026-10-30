@@ -525,4 +525,453 @@ body, html {
     backdrop-filter: var(--glass-blur);
     -webkit-backdrop-filter: var(--glass-blur);
     border-top: 1px solid var(--glass-border-hi);
-    border-left:
+    border-left: 1px solid var(--glass-border-hi);
+    border-right: 1px solid var(--glass-border-lo);
+    border-bottom: 1px solid var(--glass-border-lo);
+    box-shadow:
+        0 10px 22px rgba(0, 0, 0, 0.32),
+        inset 0 1px 1px rgba(255, 255, 255, 0.45);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    transition: transform 0.45s var(--spring-bubbly), background 0.3s ease;
+}
+
+@media (hover: hover) {
+    .app-widget:hover .app-squircle {
+        transform: translateY(-6px) scale(1.1);
+        background: var(--glass-surface-hover);
+    }
+}
+
+.app-squircle img {
+    width: 64%;
+    height: 64%;
+    object-fit: contain;
+}
+
+.app-fallback-letter {
+    font-size: 24px;
+    font-weight: 700;
+    background: linear-gradient(135deg, #fff, #93c5fd);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.app-title {
+    font-size: 12px;
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.88);
+    text-align: center;
+    max-width: 90px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* =========================================================
+   6. RIGHT PANEL: MODULAR NOTIFICATION CARDS & SPARKLINE
+   ========================================================= */
+.notif-badge {
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 999px;
+    background: rgba(56, 189, 248, 0.24);
+    border: 1px solid rgba(56, 189, 248, 0.45);
+    color: #e0f2fe;
+}
+
+.notif-card {
+    position: relative;
+    padding: 13px 14px;
+    border-radius: 18px;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.12) 0%, rgba(255, 255, 255, 0.04) 100%);
+    border-top: 1px solid rgba(255, 255, 255, 0.3);
+    border-left: 1px solid rgba(255, 255, 255, 0.25);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.26);
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    animation: notifSlideIn 0.35s var(--smooth-out);
+}
+
+@keyframes notifSlideIn {
+    from { opacity: 0; transform: translateX(18px) scale(0.96); }
+    to { opacity: 1; transform: translateX(0) scale(1); }
+}
+
+.notif-card.type-error {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.25) 0%, rgba(153, 27, 27, 0.12) 100%);
+    border-top-color: rgba(248, 113, 113, 0.65);
+    border-left-color: rgba(248, 113, 113, 0.5);
+}
+
+.notif-card.type-warning {
+    background: linear-gradient(135deg, rgba(245, 158, 11, 0.24) 0%, rgba(146, 64, 14, 0.1) 100%);
+    border-top-color: rgba(251, 191, 36, 0.6);
+}
+
+.notif-card.type-success {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.24) 0%, rgba(6, 95, 70, 0.1) 100%);
+    border-top-color: rgba(52, 211, 153, 0.6);
+}
+
+.notif-card-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.notif-title-wrap {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+}
+
+.notif-timer-pill {
+    font-size: 10.5px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    padding: 2px 7px;
+    border-radius: 99px;
+    background: rgba(0, 0, 0, 0.32);
+    color: #7dd3fc;
+}
+
+.notif-body-text {
+    font-size: 12px;
+    line-height: 1.4;
+    color: rgba(255, 255, 255, 0.86);
+    word-break: break-word;
+}
+
+.notif-live-clock {
+    font-size: 22px;
+    font-weight: 700;
+    letter-spacing: -0.5px;
+    color: #fff;
+    font-variant-numeric: tabular-nums;
+}
+
+.notif-graph-canvas {
+    width: 100%;
+    height: 54px;
+    border-radius: 10px;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* =========================================================
+   7. BUTTONS, MODALS & IFRAME STAGE
+   ========================================================= */
+.mini-glass-btn, .icon-glass-btn {
+    padding: 5px 10px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.1);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.mini-glass-btn:hover, .icon-glass-btn:hover {
+    background: rgba(255, 255, 255, 0.22);
+    transform: translateY(-1px);
+}
+
+.mini-glass-btn.accent-btn {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.38), rgba(99, 102, 241, 0.38));
+    border-color: rgba(125, 211, 252, 0.55);
+}
+
+.floating-controls-dock {
+    position: fixed;
+    bottom: max(16px, env(safe-area-inset-bottom, 16px));
+    right: 22px;
+    z-index: 100;
+    display: flex;
+    gap: 10px;
+}
+
+.ui-chrome {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.45s var(--smooth-out), transform 0.45s var(--spring-bubbly);
+}
+
+.ui-chrome.chrome-visible {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.liquid-glass-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 15px;
+    border-radius: 999px;
+    background: var(--glass-surface);
+    backdrop-filter: var(--glass-blur);
+    -webkit-backdrop-filter: var(--glass-blur);
+    border-top: 1px solid var(--glass-border-hi);
+    border-left: 1px solid var(--glass-border-hi);
+    border-right: 1px solid var(--glass-border-lo);
+    border-bottom: 1px solid var(--glass-border-lo);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 500;
+    cursor: pointer;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.32);
+}
+
+.iframe-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 1000;
+    padding: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.liquid-glass-window {
+    width: 100%;
+    height: 100%;
+    border-radius: 26px;
+    background: linear-gradient(135deg, rgba(15, 23, 42, 0.85) 0%, rgba(5, 8, 17, 0.85) 100%);
+    backdrop-filter: blur(34px) saturate(200%);
+    -webkit-backdrop-filter: blur(34px) saturate(200%);
+    border-top: 1px solid var(--glass-border-hi);
+    border-left: 1px solid var(--glass-border-hi);
+    border-right: 1px solid var(--glass-border-lo);
+    border-bottom: 1px solid var(--glass-border-lo);
+    box-shadow: 0 35px 80px rgba(0, 0, 0, 0.65);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transform-origin: var(--origin-x, 50%) var(--origin-y, 50%);
+    animation: expandFromIcon 0.45s var(--smooth-out) forwards;
+}
+
+.liquid-glass-window.closing {
+    animation: shrinkToIcon 0.32s var(--smooth-out) forwards;
+}
+
+@keyframes expandFromIcon {
+    0% { opacity: 0; transform: scale(0.12); border-radius: 48px; }
+    100% { opacity: 1; transform: scale(1); border-radius: 26px; }
+}
+
+@keyframes shrinkToIcon {
+    0% { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(0.12); }
+}
+
+.iframe-header {
+    height: 44px;
+    padding: 0 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: rgba(255, 255, 255, 0.07);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.14);
+}
+
+#app-iframe {
+    flex: 1;
+    width: 100%;
+    border: none;
+    background: #0b0f19;
+}
+
+/* Modal & Form Controls */
+.modal-backdrop {
+    position: fixed;
+    inset: 0;
+    z-index: 1100;
+    background: rgba(5, 8, 17, 0.55);
+    backdrop-filter: blur(14px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.liquid-glass-modal {
+    width: 100%;
+    max-width: 540px;
+    max-height: 85dvh;
+    border-radius: 30px;
+    background: linear-gradient(135deg, rgba(30, 41, 59, 0.78) 0%, rgba(15, 23, 42, 0.68) 100%);
+    backdrop-filter: blur(36px) saturate(210%);
+    border: 1px solid var(--glass-border-hi);
+    box-shadow: 0 35px 75px rgba(0, 0, 0, 0.65);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.modal-header {
+    padding: 16px 22px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15);
+}
+
+.modal-body {
+    padding: 18px 22px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.glass-card {
+    padding: 16px;
+    border-radius: 22px;
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.glass-card h3 {
+    font-size: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.form-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.form-row {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+}
+
+.form-row label {
+    font-size: 11.5px;
+    color: rgba(255, 255, 255, 0.78);
+}
+
+.glass-input, .glass-file-input {
+    width: 100%;
+    padding: 8px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(255, 255, 255, 0.08);
+    color: #fff;
+    font-size: 12.5px;
+    outline: none;
+}
+
+.glass-toggle-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+
+.glass-toggle-row input { display: none; }
+
+.glass-toggle-slider {
+    position: relative;
+    width: 42px;
+    height: 24px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.15);
+    border: 1px solid rgba(255, 255, 255, 0.28);
+}
+
+.glass-toggle-slider::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #fff;
+    transition: transform 0.3s var(--spring-bubbly);
+}
+
+.glass-toggle-row input:checked + .glass-toggle-slider {
+    background: linear-gradient(135deg, #38bdf8, #8b5cf6);
+}
+
+.glass-toggle-row input:checked + .glass-toggle-slider::after {
+    transform: translateX(18px);
+}
+
+.liquid-submit-btn {
+    padding: 10px 16px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.35);
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.22), rgba(255, 255, 255, 0.08));
+    color: #fff;
+    font-size: 12.5px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.liquid-close-btn {
+    width: 26px;
+    height: 26px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    background: rgba(255, 255, 255, 0.12);
+    color: #fff;
+    font-size: 12px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.liquid-close-btn:hover {
+    background: rgba(239, 68, 68, 0.7);
+}
+
+.settings-app-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.settings-app-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.08);
+    font-size: 12px;
+}
+
+@media (max-width: 1120px) {
+    #workspace {
+        grid-template-columns: 1fr;
+        overflow-y: auto;
+        height: auto;
+        max-height: 100dvh;
+    }
+    .side-glass-panel {
+        min-height: 360px;
+    }
+}

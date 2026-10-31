@@ -1,51 +1,66 @@
 import io
 import json
+import time
 import stat
 import posixpath
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from flask import Blueprint, jsonify, request, send_file
 import paramiko
-import config
+from core.storage import StorageManager
 
 blueprint = Blueprint("files", __name__)
 
-# Connection pool to avoid slow SSH handshakes on every click
 _pool_lock = threading.Lock()
-_ssh_pool = {}  # server_id -> {"ssh": SSHClient, "os": "windows"|"linux"}
+_ssh_pool = {}  # server_id -> {"ssh": SSHClient, "os": "windows"|"linux", "host": str, "user": str}
+
+
+def _get_servers_dict():
+    return StorageManager.load_settings().get("servers", {})
 
 
 def _get_ssh_connection(server_id):
-    if server_id not in config.SERVERS:
-        raise ValueError(f"Unknown server ID: {server_id}")
+    servers = _get_servers_dict()
+    sid = str(server_id)
+    if sid not in servers:
+        raise ValueError(f"Unknown server ID: {sid}")
 
-    srv = config.SERVERS[server_id]
+    srv = servers[sid]
     with _pool_lock:
-        entry = _ssh_pool.get(server_id)
-        if entry and entry["ssh"].get_transport() and entry["ssh"].get_transport().is_active():
-            return entry["ssh"], entry["os"]
+        entry = _ssh_pool.get(sid)
+        if (
+            entry
+            and entry.get("host") == srv.get("host")
+            and entry.get("user") == srv.get("user")
+            and entry["ssh"].get_transport()
+            and entry["ssh"].get_transport().is_active()
+        ):
+            return entry["ssh"], entry["os"], srv
 
-    # Establish new connection outside the global lock so slow hosts don't block others
     ssh = paramiko.SSHClient()
     ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
     ssh.connect(
         srv["host"],
         username=srv["user"],
-        password=srv["password"],
-        timeout=4,
-        banner_timeout=4,
-        auth_timeout=4
+        password=srv.get("password", ""),
+        timeout=3.5,
+        banner_timeout=3.5,
+        auth_timeout=3.5
     )
 
-    # Detect OS once per connection
-    _, stdout, _ = ssh.exec_command("uname -s", timeout=3)
+    _, stdout, _ = ssh.exec_command("uname -s", timeout=2.5)
     uname_out = stdout.read().decode("utf-8", errors="ignore").strip().lower()
     os_type = "linux" if ("linux" in uname_out or "darwin" in uname_out) else "windows"
 
     with _pool_lock:
-        _ssh_pool[server_id] = {"ssh": ssh, "os": os_type}
+        _ssh_pool[sid] = {
+            "ssh": ssh,
+            "os": os_type,
+            "host": srv.get("host"),
+            "user": srv.get("user")
+        }
 
-    return ssh, os_type
+    return ssh, os_type, srv
 
 
 def _exec_cmd(ssh, command, timeout=6):
@@ -55,18 +70,27 @@ def _exec_cmd(ssh, command, timeout=6):
     return out, err
 
 
-def _fetch_server_drives(server_id):
-    srv = config.SERVERS[server_id]
+def os_path_basename(p):
+    return posixpath.basename(p.rstrip("/"))
+
+
+def _fetch_server_drives(server_id, aliases):
+    servers = _get_servers_dict()
+    sid = str(server_id)
+    srv = servers.get(sid, {})
     drives = []
+    t0 = time.time()
+
     try:
-        ssh, os_type = _get_ssh_connection(server_id)
+        ssh, os_type, srv = _get_ssh_connection(sid)
+        latency_ms = int(round((time.time() - t0) * 1000))
+
         if os_type == "linux":
             out, _ = _exec_cmd(
                 ssh,
                 "df -B1 -P -x tmpfs -x devtmpfs -x squashfs -x overlay -x efivarfs"
             )
-            lines = out.splitlines()
-            for line in lines[1:]:
+            for line in out.splitlines()[1:]:
                 parts = line.split()
                 if len(parts) < 6:
                     continue
@@ -83,16 +107,22 @@ def _fetch_server_drives(server_id):
                     continue
                 if total <= 0:
                     continue
-                label = "Root Disk" if mountpoint == "/" else os_path_basename(mountpoint) or device
+                base_label = "Root Disk" if mountpoint == "/" else os_path_basename(mountpoint) or device
+                default_label = f"{base_label} ({mountpoint})"
+                drive_id = f"{sid}:{mountpoint}"
+                custom_alias = aliases.get(drive_id, "").strip()
+
                 drives.append({
-                    "id": f"{server_id}:{mountpoint}",
-                    "server_id": server_id,
-                    "server_name": srv.get("name", f"Server {server_id}"),
-                    "host": srv["host"],
+                    "id": drive_id,
+                    "server_id": sid,
+                    "server_name": srv.get("name", f"Server {sid}"),
+                    "host": srv.get("host", ""),
                     "os": "linux",
                     "mount": mountpoint,
                     "sftp_root": mountpoint,
-                    "label": f"{label} ({mountpoint})",
+                    "original_label": default_label,
+                    "alias": custom_alias,
+                    "label": custom_alias if custom_alias else default_label,
                     "device": device,
                     "total": total,
                     "used": used,
@@ -100,13 +130,12 @@ def _fetch_server_drives(server_id):
                     "percent": round((used / total) * 100, 1)
                 })
         else:
-            # Windows: Try PowerShell CIM first, fallback to wmic
             ps_cmd = (
                 'powershell -NoProfile -Command '
                 '"Get-CimInstance Win32_LogicalDisk | '
                 'Select-Object DeviceID,VolumeName,Size,FreeSpace | ConvertTo-Json -Compress"'
             )
-            out, _ = _exec_cmd(ssh, ps_cmd, timeout=7)
+            out, _ = _exec_cmd(ssh, ps_cmd, timeout=6)
             parsed = []
             if out and (out.startswith("[") or out.startswith("{")):
                 try:
@@ -119,7 +148,7 @@ def _fetch_server_drives(server_id):
                 wmic_out, _ = _exec_cmd(
                     ssh,
                     "wmic logicaldisk get Caption,FreeSpace,Size,VolumeName /format:csv",
-                    timeout=6
+                    timeout=5
                 )
                 for line in wmic_out.splitlines():
                     cols = [c.strip() for c in line.strip().split(",")]
@@ -141,17 +170,22 @@ def _fetch_server_drives(server_id):
                     continue
                 used = max(0, total - free)
                 vol_name = (d.get("VolumeName") or "").strip() or "Local Disk"
-                # OpenSSH SFTP on Windows accepts /C:/ or C:/
+                default_label = f"{vol_name} ({dev_id})"
                 sftp_root = f"/{dev_id}/" if not dev_id.startswith("/") else f"{dev_id}/"
+                drive_id = f"{sid}:{dev_id}"
+                custom_alias = aliases.get(drive_id, "").strip()
+
                 drives.append({
-                    "id": f"{server_id}:{dev_id}",
-                    "server_id": server_id,
-                    "server_name": srv.get("name", f"Server {server_id}"),
-                    "host": srv["host"],
+                    "id": drive_id,
+                    "server_id": sid,
+                    "server_name": srv.get("name", f"Server {sid}"),
+                    "host": srv.get("host", ""),
                     "os": "windows",
                     "mount": dev_id,
                     "sftp_root": sftp_root,
-                    "label": f"{vol_name} ({dev_id})",
+                    "original_label": default_label,
+                    "alias": custom_alias,
+                    "label": custom_alias if custom_alias else default_label,
                     "device": dev_id,
                     "total": total,
                     "used": used,
@@ -159,22 +193,33 @@ def _fetch_server_drives(server_id):
                     "percent": round((used / total) * 100, 1)
                 })
 
-        return {"server_id": server_id, "online": True, "drives": drives, "error": None}
+        return {
+            "server_id": sid,
+            "name": srv.get("name", f"Server {sid}"),
+            "host": srv.get("host", ""),
+            "shell_url": srv.get("shell_url", f"https://device.teamexist.com/shell/{sid}"),
+            "os": os_type,
+            "online": True,
+            "latency_ms": latency_ms,
+            "drive_count": len(drives),
+            "drives": drives,
+            "error": None
+        }
     except Exception as e:
         with _pool_lock:
-            _ssh_pool.pop(server_id, None)
+            _ssh_pool.pop(sid, None)
         return {
-            "server_id": server_id,
-            "server_name": srv.get("name", f"Server {server_id}"),
-            "host": srv["host"],
+            "server_id": sid,
+            "name": srv.get("name", f"Server {sid}"),
+            "host": srv.get("host", ""),
+            "shell_url": srv.get("shell_url", f"https://device.teamexist.com/shell/{sid}"),
+            "os": "unknown",
             "online": False,
+            "latency_ms": None,
+            "drive_count": 0,
             "drives": [],
             "error": str(e)
         }
-
-
-def os_path_basename(p):
-    return posixpath.basename(p.rstrip("/"))
 
 
 def _normalize_sftp_path(path_str, os_type):
@@ -182,7 +227,6 @@ def _normalize_sftp_path(path_str, os_type):
         return "/"
     p = path_str.replace("\\", "/")
     if os_type == "windows":
-        # OpenSSH SFTP on Windows works with /C:/folder or C:/folder
         if len(p) >= 2 and p[1] == ":":
             p = "/" + p
         if len(p) == 3 and p.startswith("/") and p.endswith(":"):
@@ -192,22 +236,32 @@ def _normalize_sftp_path(path_str, os_type):
 
 @blueprint.route("/api/files/drives", methods=["GET"])
 def list_all_drives():
-    server_ids = list(config.SERVERS.keys())
+    settings = StorageManager.load_settings()
+    servers = settings.get("servers", {})
+    aliases = settings.get("drive_aliases", {})
+    server_ids = list(servers.keys())
+
     all_drives = []
     server_status = {}
 
-    with ThreadPoolExecutor(max_workers=len(server_ids) or 1) as pool:
-        results = list(pool.map(_fetch_server_drives, server_ids))
+    if server_ids:
+        with ThreadPoolExecutor(max_workers=len(server_ids)) as pool:
+            results = list(pool.map(lambda s: _fetch_server_drives(s, aliases), server_ids))
 
-    for res in results:
-        sid = res["server_id"]
-        server_status[sid] = {
-            "online": res["online"],
-            "error": res["error"],
-            "host": config.SERVERS[sid]["host"],
-            "name": config.SERVERS[sid].get("name", f"Server {sid}")
-        }
-        all_drives.extend(res["drives"])
+        for res in results:
+            sid = res["server_id"]
+            server_status[sid] = {
+                "id": sid,
+                "name": res["name"],
+                "host": res["host"],
+                "shell_url": res["shell_url"],
+                "os": res["os"],
+                "online": res["online"],
+                "latency_ms": res["latency_ms"],
+                "drive_count": res["drive_count"],
+                "error": res["error"]
+            }
+            all_drives.extend(res["drives"])
 
     return jsonify({
         "ok": True,
@@ -222,14 +276,13 @@ def list_directory():
     raw_path = request.args.get("path", "/")
 
     try:
-        ssh, os_type = _get_ssh_connection(server_id)
+        ssh, os_type, _ = _get_ssh_connection(server_id)
         sftp = ssh.open_sftp()
         target_path = _normalize_sftp_path(raw_path, os_type)
 
         try:
             attrs = sftp.listdir_attr(target_path)
         except IOError:
-            # Fallback if Windows SFTP prefers C:/ without leading slash
             if target_path.startswith("/") and len(target_path) >= 3 and target_path[2] == ":":
                 target_path = target_path[1:]
                 attrs = sftp.listdir_attr(target_path)
@@ -255,7 +308,6 @@ def list_directory():
             })
 
         sftp.close()
-        # Sort folders first, then alphabetically
         items.sort(key=lambda x: (not x["is_dir"], x["name"].lower()))
 
         return jsonify({
@@ -275,7 +327,7 @@ def download_file():
     raw_path = request.args.get("path", "")
 
     try:
-        ssh, os_type = _get_ssh_connection(server_id)
+        ssh, os_type, _ = _get_ssh_connection(server_id)
         sftp = ssh.open_sftp()
         target_path = _normalize_sftp_path(raw_path, os_type)
 
@@ -310,7 +362,7 @@ def upload_file():
         return jsonify({"ok": False, "error": "Empty file list."}), 400
 
     try:
-        ssh, os_type = _get_ssh_connection(server_id)
+        ssh, os_type, _ = _get_ssh_connection(server_id)
         sftp = ssh.open_sftp()
         target_dir = _normalize_sftp_path(raw_dir, os_type)
 
@@ -349,7 +401,7 @@ def create_directory():
         return jsonify({"ok": False, "error": "Folder name required."}), 400
 
     try:
-        ssh, os_type = _get_ssh_connection(server_id)
+        ssh, os_type, _ = _get_ssh_connection(server_id)
         sftp = ssh.open_sftp()
         norm_parent = _normalize_sftp_path(parent_path, os_type)
         new_dir = posixpath.join(norm_parent.rstrip("/"), folder_name)
@@ -377,7 +429,7 @@ def delete_item():
     is_dir = bool(data.get("is_dir", False))
 
     try:
-        ssh, os_type = _get_ssh_connection(server_id)
+        ssh, os_type, _ = _get_ssh_connection(server_id)
         sftp = ssh.open_sftp()
         target_path = _normalize_sftp_path(raw_path, os_type)
 

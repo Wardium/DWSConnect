@@ -2,9 +2,13 @@
     const workspace = document.getElementById("workspace");
     const appGrid = document.getElementById("app-grid");
     const appSearchInput = document.getElementById("app-search-input");
+    const quickFileResults = document.getElementById("quick-file-search-results");
     const defaultSvg = document.getElementById("default-bg-svg");
     const customBgImg = document.getElementById("custom-bg-img");
     const timeSlotPill = document.getElementById("time-slot-pill");
+
+    // Mobile Switcher
+    const mobileSwitchBtns = document.querySelectorAll(".mobile-switch-btn");
 
     // Expanding Center Stage Iframe Elements
     const centerStage = document.getElementById("center-iframe-stage");
@@ -40,11 +44,23 @@
     const bgForm = document.getElementById("bg-form");
     const resetBgBtn = document.getElementById("btn-reset-bg");
     const videoNotifForm = document.getElementById("video-notif-form");
+    const octoprintForm = document.getElementById("octoprint-form");
+
+    // Custom Theme Studio Inputs
+    const ctBgBase = document.getElementById("ct-bg-base");
+    const ctTextMain = document.getElementById("ct-text-main");
+    const ctAccent1 = document.getElementById("ct-accent-1");
+    const ctAccent2 = document.getElementById("ct-accent-2");
+    const ctAccent3 = document.getElementById("ct-accent-3");
+    const ctNameInput = document.getElementById("custom-theme-name");
+    const saveCustomPresetBtn = document.getElementById("btn-save-custom-preset");
+    const savedThemesListEl = document.getElementById("saved-custom-themes-list");
 
     const DROPDOWN_STORAGE_KEY = "dws_user_dropdown_widget_v1";
-    let serverState = { ui: {}, background: {}, apps: [], servers: {}, drive_aliases: {} };
+    let serverState = { ui: {}, octoprint: {}, background: {}, apps: [], servers: {}, drive_aliases: {} };
     let activeStageApp = null;
     let activeDropdownApp = null;
+    let fileSearchTimer = null;
     let resolveDashboardReady;
 
     window.dashboardReadyPromise = new Promise((resolve) => {
@@ -52,15 +68,58 @@
     });
 
     // =========================================================================
-    // 1. OS-SYNCED DYNAMIC DARK / LIGHT MODE & LIQUID FX
+    // 1. PHONE / PORTRAIT TOP PANE SWITCHER
+    // =========================================================================
+    function switchMobilePane(paneName) {
+        workspace.setAttribute("data-mobile-active", paneName);
+        mobileSwitchBtns.forEach((btn) => {
+            btn.classList.toggle("active", btn.dataset.mobilePane === paneName);
+        });
+    }
+
+    window.switchMobilePane = switchMobilePane;
+
+    mobileSwitchBtns.forEach((btn) => {
+        btn.addEventListener("click", () => switchMobilePane(btn.dataset.mobilePane));
+    });
+
+    // =========================================================================
+    // 2. THEME ENGINE & CUSTOM THEME STUDIO
     // =========================================================================
     const osDarkMedia = window.matchMedia("(prefers-color-scheme: dark)");
 
+    function applyCustomThemeVars(ct) {
+        if (!ct) return;
+        const root = document.documentElement.style;
+        root.setProperty("--bg-base", ct.bg_base || "#070b19");
+        root.setProperty("--text-main", ct.text_main || "#ffffff");
+        root.setProperty("--accent-1", ct.accent_1 || "#38bdf8");
+        root.setProperty("--accent-2", ct.accent_2 || "#a855f7");
+        root.setProperty("--accent-3", ct.accent_3 || "#ec4899");
+        root.setProperty("--accent-glow", `${ct.accent_1 || "#38bdf8"}73`);
+    }
+
+    function clearCustomThemeVars() {
+        const root = document.documentElement.style;
+        ["--bg-base", "--text-main", "--accent-1", "--accent-2", "--accent-3", "--accent-glow"].forEach((p) =>
+            root.removeProperty(p)
+        );
+    }
+
     function applyThemeAndUI(ui = {}) {
         const mode = ui.theme || "auto";
-        const effectiveTheme = mode === "auto" ? (osDarkMedia.matches ? "dark" : "light") : mode;
-        document.documentElement.setAttribute("data-theme", effectiveTheme);
-        document.documentElement.setAttribute("data-accent", ui.accent || "aurora");
+        const accent = ui.accent || "aurora";
+
+        if (mode === "custom" || accent === "custom") {
+            document.documentElement.setAttribute("data-theme", "dark");
+            document.documentElement.setAttribute("data-accent", "custom");
+            applyCustomThemeVars(ui.custom_theme);
+        } else {
+            clearCustomThemeVars();
+            const effectiveTheme = mode === "auto" ? (osDarkMedia.matches ? "dark" : "light") : mode;
+            document.documentElement.setAttribute("data-theme", effectiveTheme);
+            document.documentElement.setAttribute("data-accent", accent);
+        }
 
         if (ui.glass_blur) {
             document.documentElement.style.setProperty("--glass-blur-px", `${ui.glass_blur}px`);
@@ -69,13 +128,12 @@
             window.dwsParallaxIntensity = Number(ui.parallax_intensity);
         }
 
-        // Sync inputs in Settings
         const themeSel = document.getElementById("ui-theme-select");
         const accentSel = document.getElementById("ui-accent-select");
         const blurRange = document.getElementById("ui-blur-range");
         const parallaxRange = document.getElementById("ui-parallax-range");
         if (themeSel) themeSel.value = mode;
-        if (accentSel) accentSel.value = ui.accent || "aurora";
+        if (accentSel) accentSel.value = accent;
         if (blurRange && ui.glass_blur) {
             blurRange.value = ui.glass_blur;
             document.getElementById("blur-val-label").textContent = `${ui.glass_blur}px`;
@@ -84,16 +142,91 @@
             parallaxRange.value = ui.parallax_intensity;
             document.getElementById("parallax-val-label").textContent = `${ui.parallax_intensity}`;
         }
+
+        if (ui.custom_theme) {
+            ctBgBase.value = ui.custom_theme.bg_base || "#070b19";
+            ctTextMain.value = ui.custom_theme.text_main || "#ffffff";
+            ctAccent1.value = ui.custom_theme.accent_1 || "#38bdf8";
+            ctAccent2.value = ui.custom_theme.accent_2 || "#a855f7";
+            ctAccent3.value = ui.custom_theme.accent_3 || "#ec4899";
+        }
+        renderSavedCustomThemes(ui.saved_themes || []);
+    }
+
+    function getCurrentPickerTheme() {
+        return {
+            bg_base: ctBgBase.value,
+            text_main: ctTextMain.value,
+            accent_1: ctAccent1.value,
+            accent_2: ctAccent2.value,
+            accent_3: ctAccent3.value
+        };
+    }
+
+    [ctBgBase, ctTextMain, ctAccent1, ctAccent2, ctAccent3].forEach((input) => {
+        if (!input) return;
+        input.addEventListener("input", () => {
+            document.getElementById("ui-theme-select").value = "custom";
+            document.getElementById("ui-accent-select").value = "custom";
+            applyCustomThemeVars(getCurrentPickerTheme());
+        });
+    });
+
+    function renderSavedCustomThemes(list) {
+        if (!savedThemesListEl) return;
+        savedThemesListEl.innerHTML = "";
+        list.forEach((preset, idx) => {
+            const pill = document.createElement("button");
+            pill.type = "button";
+            pill.className = "glass-pill-btn";
+            pill.style.borderLeft = `4px solid ${preset.accent_1 || "#38bdf8"}`;
+            pill.textContent = preset.name || `Theme ${idx + 1}`;
+            pill.addEventListener("click", () => {
+                ctBgBase.value = preset.bg_base;
+                ctTextMain.value = preset.text_main;
+                ctAccent1.value = preset.accent_1;
+                ctAccent2.value = preset.accent_2;
+                ctAccent3.value = preset.accent_3;
+                document.getElementById("ui-theme-select").value = "custom";
+                document.getElementById("ui-accent-select").value = "custom";
+                applyCustomThemeVars(preset);
+            });
+            savedThemesListEl.appendChild(pill);
+        });
+    }
+
+    if (saveCustomPresetBtn) {
+        saveCustomPresetBtn.addEventListener("click", async () => {
+            const name = (ctNameInput.value || "").trim() || "Custom Theme";
+            const saved = Array.isArray(serverState.ui?.saved_themes) ? [...serverState.ui.saved_themes] : [];
+            saved.push({ name, ...getCurrentPickerTheme() });
+            ctNameInput.value = "";
+            const res = await fetch("/api/ui", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    theme: "custom",
+                    accent: "custom",
+                    custom_theme: getCurrentPickerTheme(),
+                    saved_themes: saved
+                })
+            });
+            if (res.ok) {
+                const data = await res.json();
+                serverState = data.settings;
+                applyThemeAndUI(serverState.ui);
+            }
+        });
     }
 
     osDarkMedia.addEventListener("change", () => {
-        if ((serverState.ui && serverState.ui.theme) === "auto" || !serverState.ui?.theme) {
+        if ((serverState.ui && serverState.ui.theme) === "auto") {
             applyThemeAndUI(serverState.ui || {});
         }
     });
 
     // =========================================================================
-    // 2. TIME-OF-DAY DYNAMIC WALLPAPER ENGINE
+    // 3. TIME-OF-DAY DYNAMIC WALLPAPER ENGINE
     // =========================================================================
     function getCurrentTimeSlot() {
         const hr = new Date().getHours();
@@ -119,7 +252,6 @@
     }
 
     function renderBackground(bg = {}) {
-        // Sync form fields
         const timeToggle = document.getElementById("time-bg-toggle");
         const staticUrlInput = document.getElementById("bg-static-url");
         if (timeToggle) timeToggle.checked = Boolean(bg.time_based_enabled);
@@ -133,7 +265,7 @@
 
         const targetUrl = resolveActiveWallpaperUrl(bg);
         return new Promise((resolve) => {
-            const timeout = setTimeout(resolve, 380);
+            const timeout = setTimeout(resolve, 350);
             if (targetUrl) {
                 customBgImg.onload = () => {
                     clearTimeout(timeout);
@@ -164,15 +296,8 @@
         });
     }
 
-    // Re-evaluate time-of-day wallpaper every 60 seconds
-    setInterval(() => {
-        if (!document.hidden && serverState.background?.time_based_enabled) {
-            renderBackground(serverState.background);
-        }
-    }, 60000);
-
     // =========================================================================
-    // 3. EXPANDING CENTER STAGE IFRAME & BOTTOM DROPDOWN WIDGET DRAWER
+    // 4. EXPANDING CENTER STAGE & DROPDOWN WIDGET DRAWER
     // =========================================================================
     function openCenterStageApp(app) {
         activeStageApp = app;
@@ -274,7 +399,7 @@
     window.openDropdownWidget = openDropdownWidget;
 
     // =========================================================================
-    // 4. APP GRID RENDERING & LAUNCH ROUTING
+    // 5. APP GRID & SHALLOW CROSS-SERVER FILE SEARCH
     // =========================================================================
     window.recalculateTopToBottomStagger = function () {
         const widgets = Array.from(appGrid.querySelectorAll(".app-widget"));
@@ -282,7 +407,7 @@
         const rowTops = [...new Set(widgets.map((w) => w.offsetTop))].sort((a, b) => a - b);
         widgets.forEach((widget, idx) => {
             const rowIndex = rowTops.indexOf(widget.offsetTop);
-            const delayMs = rowIndex * 75 + (idx % 6) * 22;
+            const delayMs = rowIndex * 60 + (idx % 6) * 18;
             widget.style.setProperty("--stagger-delay", `${delayMs}ms`);
         });
     };
@@ -315,7 +440,6 @@
                     const badge = document.createElement("span");
                     badge.className = "app-mode-dot";
                     badge.textContent = "↓";
-                    badge.title = "Opens in Bottom-Right Dropdown Widget";
                     squircle.appendChild(badge);
                 }
 
@@ -337,13 +461,74 @@
             window.open(app.url, "_blank", "noopener");
         } else if (mode === "dropdown") {
             openDropdownWidget(app, true);
+            if (window.innerWidth <= 920) switchMobilePane("notifs");
         } else {
             openCenterStageApp(app);
         }
     }
 
+    async function runShallowFileSearch(query) {
+        if (!quickFileResults) return;
+        if (!query || query.length < 2) {
+            quickFileResults.classList.add("hidden");
+            quickFileResults.innerHTML = "";
+            return;
+        }
+        try {
+            const res = await fetch(`/api/files/search?q=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            const items = data.results || [];
+            if (!items.length) {
+                quickFileResults.classList.add("hidden");
+                return;
+            }
+            quickFileResults.innerHTML = "";
+            items.forEach((item) => {
+                const row = document.createElement("div");
+                row.className = "quick-file-item";
+                const icon = item.is_dir ? "📁" : "📄";
+                row.innerHTML = `
+                    <div style="display:flex;align-items:center;gap:8px;min-width:0;">
+                        <span>${icon}</span>
+                        <div style="min-width:0;">
+                            <div style="font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${item.name}</div>
+                            <div style="font-size:10.5px;color:var(--text-muted);">${item.server_name} · ${item.drive_label}</div>
+                        </div>
+                    </div>
+                    <span class="glass-badge">${item.is_dir ? "Open Folder" : "↓ Download"}</span>
+                `;
+                row.addEventListener("click", () => {
+                    quickFileResults.classList.add("hidden");
+                    if (item.is_dir && typeof window.openDriveAndPath === "function") {
+                        window.openDriveAndPath(item.drive_id, item.path);
+                    } else if (!item.is_dir) {
+                        const dlUrl = `/api/files/download?server_id=${encodeURIComponent(item.server_id)}&path=${encodeURIComponent(item.path)}`;
+                        window.open(dlUrl, "_blank");
+                    }
+                });
+                quickFileResults.appendChild(row);
+            });
+            quickFileResults.classList.remove("hidden");
+        } catch (e) {}
+    }
+
+    if (appSearchInput) {
+        appSearchInput.addEventListener("input", () => {
+            renderAppGrid(serverState.apps);
+            clearTimeout(fileSearchTimer);
+            const q = appSearchInput.value.trim();
+            fileSearchTimer = setTimeout(() => runShallowFileSearch(q), 240);
+        });
+
+        document.addEventListener("click", (e) => {
+            if (!e.target.closest(".center-search-wrapper") && quickFileResults) {
+                quickFileResults.classList.add("hidden");
+            }
+        });
+    }
+
     // =========================================================================
-    // 5. SETTINGS CONTROL CENTER TABS & CRUD HANDLERS
+    // 6. SETTINGS TABS & CRUD HANDLERS
     // =========================================================================
     function openSettingsToTab(tabId = "tab-apps", serverIdToEdit = null) {
         settingsModal.classList.remove("hidden");
@@ -494,7 +679,6 @@
 
     window.renderSettingsDrivesList = renderSettingsDrivesList;
 
-    // Form Submissions
     addAppForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const formData = new FormData(addAppForm);
@@ -507,6 +691,38 @@
             addAppForm.reset();
         }
     });
+
+    if (octoprintForm) {
+        octoprintForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const payload = {
+                enabled: document.getElementById("octo-enabled-toggle").checked,
+                url: document.getElementById("octo-url-input").value.trim(),
+                api_key: document.getElementById("octo-key-input").value.trim()
+            };
+            const res = await fetch("/api/octoprint/config", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
+            });
+            if (res.ok) {
+                const data = await res.json();
+                serverState = data.settings;
+                document.getElementById("octo-key-input").value = "";
+                if (window.DWSNotifications) {
+                    window.DWSNotifications.pollOctoPrint();
+                    window.DWSNotifications.push({
+                        title: "OctoPrint Linked",
+                        icon: "🖨",
+                        type: "success",
+                        message: `Watching ${payload.url}`,
+                        timerSeconds: 5,
+                        autoDismiss: true
+                    });
+                }
+            }
+        });
+    }
 
     serverForm.addEventListener("submit", async (e) => {
         e.preventDefault();
@@ -570,7 +786,8 @@
             theme: document.getElementById("ui-theme-select").value,
             accent: document.getElementById("ui-accent-select").value,
             glass_blur: Number(document.getElementById("ui-blur-range").value),
-            parallax_intensity: Number(document.getElementById("ui-parallax-range").value)
+            parallax_intensity: Number(document.getElementById("ui-parallax-range").value),
+            custom_theme: getCurrentPickerTheme()
         };
         const res = await fetch("/api/ui", {
             method: "POST",
@@ -596,20 +813,11 @@
         }
     });
 
-    if (appSearchInput) {
-        appSearchInput.addEventListener("input", () => renderAppGrid(serverState.apps));
-        appSearchInput.addEventListener("keydown", (e) => {
-            if (e.key === "Enter") {
-                const firstWidget = appGrid.querySelector(".app-widget");
-                if (firstWidget) firstWidget.click();
-            }
-        });
-    }
-
     window.addEventListener("keydown", (e) => {
         if (e.key === "Escape") {
             closeCenterStage();
             settingsModal.classList.add("hidden");
+            if (quickFileResults) quickFileResults.classList.add("hidden");
         } else if (e.key === "/" && document.activeElement.tagName !== "INPUT") {
             e.preventDefault();
             if (appSearchInput) appSearchInput.focus();
@@ -626,6 +834,12 @@
             renderSettingsAppList(serverState.apps);
             renderSettingsServersList(serverState.servers);
             restoreSavedDropdownWidget();
+
+            if (serverState.octoprint) {
+                document.getElementById("octo-enabled-toggle").checked = Boolean(serverState.octoprint.enabled);
+                document.getElementById("octo-url-input").value = serverState.octoprint.url || "http://192.168.2.100";
+            }
+
             await renderBackground(serverState.background);
         } catch (err) {
             console.error("[DASHBOARD] Error loading state:", err);

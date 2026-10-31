@@ -6,6 +6,7 @@
     const statusDot = document.getElementById("drives-status-dot");
     const backToDrivesBtn = document.getElementById("btn-back-to-drives");
     const refreshBtn = document.getElementById("btn-refresh-files");
+    const serverShellBar = document.getElementById("server-shell-bar");
 
     const breadcrumbsEl = document.getElementById("file-breadcrumbs");
     const filterInput = document.getElementById("file-filter-input");
@@ -26,6 +27,7 @@
     let currentPath = "/";
     let currentItems = [];
     let selectedItem = null;
+    let latestDrives = [];
 
     function formatBytes(bytes) {
         if (!bytes || bytes <= 0) return "0 B";
@@ -34,9 +36,33 @@
         return `${(bytes / Math.pow(1024, i)).toFixed(i > 1 ? 1 : 0)} ${units[i]}`;
     }
 
+    function renderServerShellButtons(serversMap) {
+        if (!serverShellBar) return;
+        serverShellBar.innerHTML = `<span class="shell-bar-label">SSH Shell:</span>`;
+        Object.values(serversMap || {}).forEach((srv) => {
+            const btn = document.createElement("button");
+            btn.className = "glass-pill-btn";
+            btn.textContent = srv.name || `Srv ${srv.id}`;
+            btn.title = `Connect SSH: ${srv.shell_url || "https://device.teamexist.com/shell/" + srv.id}`;
+            btn.addEventListener("click", () => {
+                const targetUrl = srv.shell_url || `https://device.teamexist.com/shell/${srv.id}`;
+                if (typeof window.openCenterStageApp === "function") {
+                    window.openCenterStageApp({
+                        name: `${srv.name} — SSH Shell`,
+                        url: targetUrl,
+                        subject_type: `SSH Node ${srv.id}`
+                    });
+                } else {
+                    window.open(targetUrl, "_blank", "noopener");
+                }
+            });
+            serverShellBar.appendChild(btn);
+        });
+    }
+
     async function loadDrives(silent = false) {
         if (!silent && !currentDrive) {
-            drivesListView.innerHTML = `<div class="panel-empty-state">Scanning 3 SSH servers for disks...</div>`;
+            drivesListView.innerHTML = `<div class="panel-empty-state">Scanning SSH servers for disks...</div>`;
         }
         try {
             const res = await fetch("/api/files/drives");
@@ -44,9 +70,17 @@
             if (!data.ok) throw new Error(data.error || "Failed scanning drives");
 
             const drives = data.drives || [];
+            latestDrives = drives;
             drivesCountBadge.textContent = `${drives.length} Disk${drives.length === 1 ? "" : "s"}`;
 
-            // Detect newly connected or disconnected drives
+            renderServerShellButtons(data.servers || {});
+            if (window.DWSNotifications && typeof window.DWSNotifications.updateServerClusterCard === "function") {
+                window.DWSNotifications.updateServerClusterCard(data.servers || {});
+            }
+            if (typeof window.renderSettingsDrivesList === "function") {
+                window.renderSettingsDrivesList(drives);
+            }
+
             const nextIds = new Set(drives.map((d) => d.id));
             if (initialScanDone && window.DWSNotifications) {
                 drives.forEach((d) => {
@@ -56,19 +90,8 @@
                             icon: "💽",
                             type: "success",
                             message: `${d.label} connected on ${d.server_name} (${formatBytes(d.free)} free).`,
-                            timerSeconds: 12,
+                            timerSeconds: 10,
                             autoDismiss: true
-                        });
-                    }
-                });
-                knownDriveIds.forEach((oldId) => {
-                    if (!nextIds.has(oldId)) {
-                        window.DWSNotifications.push({
-                            title: "Drive Disconnected",
-                            icon: "🔌",
-                            type: "warn",
-                            message: `Disk ${oldId} was disconnected.`,
-                            liveElapsed: true
                         });
                     }
                 });
@@ -76,23 +99,40 @@
             knownDriveIds = nextIds;
             initialScanDone = true;
 
-            // Check if any server is offline
             const offlineServers = Object.values(data.servers || {}).filter((s) => !s.online);
             statusDot.classList.toggle("warn", offlineServers.length > 0);
 
             renderDrivesList(drives, data.servers || {});
         } catch (err) {
             statusDot.classList.add("warn");
-            if (window.DWSNotifications && !silent) {
-                window.DWSNotifications.push({
-                    title: "Drive Scan Error",
-                    icon: "⚠",
-                    type: "error",
-                    message: err.message,
-                    liveElapsed: true
-                });
-            }
         }
+    }
+
+    async function promptDriveRename(drive, e) {
+        if (e) e.stopPropagation();
+        const nextName = prompt(
+            `Enter a new server-wide display name for ${drive.original_label} on ${drive.server_name} (leave empty to reset):`,
+            drive.alias || drive.label
+        );
+        if (nextName === null) return;
+
+        try {
+            const res = await fetch("/api/drives/alias", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    drive_id: drive.id,
+                    alias: nextName.trim()
+                })
+            });
+            const data = await res.json();
+            if (data.ok) {
+                await loadDrives(true);
+                if (currentDrive && currentDrive.id === drive.id) {
+                    panelTitle.textContent = nextName.trim() || drive.original_label;
+                }
+            }
+        } catch (err) {}
     }
 
     function renderDrivesList(drives, serversMap) {
@@ -107,49 +147,57 @@
             card.className = "drive-card";
 
             const meterClass = drive.percent >= 90 ? "crit" : drive.percent >= 78 ? "warn" : "";
-            const osLabel = drive.os === "linux" ? "Linux / Pi" : "Windows";
+            const osLabel = drive.os === "linux" ? "Linux" : "Win";
 
             card.innerHTML = `
                 <div class="drive-card-top">
                     <div class="drive-title-wrap">
                         <div class="drive-icon">💽</div>
-                        <div>
-                            <div class="drive-name">${drive.label}</div>
-                            <div class="drive-server-sub">${drive.server_name} · ${drive.host}</div>
+                        <div style="min-width:0;">
+                            <div class="drive-name" title="${drive.label}">${drive.label}</div>
+                            <div class="drive-server-sub">${drive.server_name} · ${drive.mount}</div>
                         </div>
                     </div>
-                    <span class="drive-os-tag">${osLabel}</span>
+                    <div class="drive-card-actions">
+                        <button class="drive-rename-btn" title="Rename Drive Locally on Server">✎</button>
+                        <span class="drive-os-tag">${osLabel}</span>
+                    </div>
                 </div>
                 <div class="drive-meter-track">
                     <div class="drive-meter-fill ${meterClass}" style="width: ${Math.min(100, drive.percent)}%"></div>
                 </div>
                 <div class="drive-stats-row">
-                    <span>${formatBytes(drive.used)} used of ${formatBytes(drive.total)}</span>
+                    <span>${formatBytes(drive.used)} / ${formatBytes(drive.total)}</span>
                     <span><strong>${formatBytes(drive.free)}</strong> free (${drive.percent}%)</span>
                 </div>
             `;
 
+            card.querySelector(".drive-rename-btn").addEventListener("click", (e) => promptDriveRename(drive, e));
             card.addEventListener("click", () => openDrive(drive));
             drivesListView.appendChild(card);
         });
 
-        // Show offline server notices at the bottom of the drive list
-        Object.entries(serversMap).forEach(([sid, info]) => {
+        Object.values(serversMap).forEach((info) => {
             if (!info.online) {
                 const off = document.createElement("div");
                 off.className = "drive-card";
-                off.style.borderColor = "rgba(248, 113, 113, 0.4)";
+                off.style.borderColor = "rgba(248, 113, 113, 0.45)";
                 off.innerHTML = `
                     <div class="drive-card-top">
                         <div class="drive-title-wrap">
-                            <div class="drive-icon" style="border-color:#f87171;background:rgba(239,68,68,0.2);">⚠</div>
+                            <div class="drive-icon">⚠</div>
                             <div>
                                 <div class="drive-name">${info.name} (${info.host})</div>
-                                <div class="drive-server-sub">SSH Unreachable: ${info.error || "Timeout"}</div>
+                                <div class="drive-server-sub">SSH Offline — Click to open terminal or settings</div>
                             </div>
                         </div>
                     </div>
                 `;
+                off.addEventListener("click", () => {
+                    if (typeof window.openSettingsToTab === "function") {
+                        window.openSettingsToTab("tab-servers", info.id);
+                    }
+                });
                 drivesListView.appendChild(off);
             }
         });
@@ -179,13 +227,13 @@
         if (!currentDrive) return;
         selectedItem = null;
         selectionBar.classList.add("hidden");
-        fileItemsList.innerHTML = `<div class="panel-empty-state">Loading directory...</div>`;
+        fileItemsList.innerHTML = `<div class="panel-empty-state">Opening folder...</div>`;
 
         try {
             const url = `/api/files/list?server_id=${encodeURIComponent(currentDrive.server_id)}&path=${encodeURIComponent(targetPath)}`;
             const res = await fetch(url);
             const data = await res.json();
-            if (!data.ok) throw new Error(data.error || "Unable to open folder");
+            if (!data.ok) throw new Error(data.error || "Unable to list directory");
 
             currentPath = data.path;
             currentItems = data.items || [];
@@ -193,15 +241,6 @@
             renderFileItems();
         } catch (err) {
             fileItemsList.innerHTML = `<div class="panel-empty-state">Error: ${err.message}</div>`;
-            if (window.DWSNotifications) {
-                window.DWSNotifications.push({
-                    title: `SFTP Error (${currentDrive.server_name})`,
-                    icon: "⚠",
-                    type: "error",
-                    message: err.message,
-                    liveElapsed: true
-                });
-            }
         }
     }
 
@@ -216,10 +255,9 @@
         rootCrumb.onclick = () => navigateToPath(currentDrive.sftp_root);
         breadcrumbsEl.appendChild(rootCrumb);
 
-        let acc = clean.startsWith("/") ? "" : "";
+        let acc = "";
         parts.forEach((part, idx) => {
             acc += "/" + part;
-            // Skip repeating Windows drive letter root
             if (idx === 0 && part.endsWith(":")) return;
             const crumb = document.createElement("span");
             crumb.className = "breadcrumb-crumb";
@@ -234,14 +272,13 @@
         const query = (filterInput.value || "").trim().toLowerCase();
         fileItemsList.innerHTML = "";
 
-        // Parent '..' row if not at drive root
         if (currentPath !== currentDrive.sftp_root && currentPath !== "/") {
             const upRow = document.createElement("div");
             upRow.className = "file-row";
             upRow.innerHTML = `
                 <div class="file-row-left">
                     <span class="file-row-icon">↩</span>
-                    <span class="file-row-name">.. (Parent Folder)</span>
+                    <span class="file-row-name">.. (Parent Directory)</span>
                 </div>
             `;
             upRow.onclick = () => {
@@ -256,7 +293,7 @@
         if (filtered.length === 0) {
             const empty = document.createElement("div");
             empty.className = "panel-empty-state";
-            empty.textContent = query ? "No matching files." : "Folder is empty (Drag files here to upload).";
+            empty.textContent = query ? "No matching files." : "Empty directory (Drop files here to upload).";
             fileItemsList.appendChild(empty);
             return;
         }
@@ -303,7 +340,7 @@
                   title: "Uploading to " + currentDrive.label,
                   icon: "↑",
                   type: "live",
-                  message: `Uploading ${fileList.length} file(s) to ${currentPath}...`,
+                  message: `Transferring ${fileList.length} file(s)...`,
                   liveElapsed: true
               })
             : null;
@@ -312,7 +349,6 @@
             const res = await fetch("/api/files/upload", { method: "POST", body: formData });
             const data = await res.json();
             if (notif) window.DWSNotifications.remove(notif.id);
-
             if (!data.ok) throw new Error(data.error || "Upload failed");
 
             if (window.DWSNotifications) {
@@ -320,8 +356,8 @@
                     title: "Upload Complete",
                     icon: "✓",
                     type: "success",
-                    message: `Uploaded ${(data.uploaded || []).join(", ")}`,
-                    timerSeconds: 8,
+                    message: `Saved ${(data.uploaded || []).join(", ")}`,
+                    timerSeconds: 6,
                     autoDismiss: true
                 });
             }
@@ -331,17 +367,15 @@
             if (notif) window.DWSNotifications.remove(notif.id);
             if (window.DWSNotifications) {
                 window.DWSNotifications.push({
-                    title: "Upload Failed",
+                    title: "Upload Error",
                     icon: "⚠",
                     type: "error",
-                    message: err.message,
-                    liveElapsed: true
+                    message: err.message
                 });
             }
         }
     }
 
-    // Event bindings
     backToDrivesBtn.addEventListener("click", closeDriveToOverview);
     refreshBtn.addEventListener("click", () => {
         if (currentDrive) navigateToPath(currentPath);
@@ -349,7 +383,6 @@
     });
 
     filterInput.addEventListener("input", renderFileItems);
-
     uploadTriggerBtn.addEventListener("click", () => hiddenFileInput.click());
     hiddenFileInput.addEventListener("change", () => {
         if (hiddenFileInput.files.length > 0) {
@@ -358,7 +391,6 @@
         }
     });
 
-    // Drag and Drop upload support
     fileListContainer.addEventListener("dragover", (e) => {
         e.preventDefault();
         fileListContainer.classList.add("drag-over");
@@ -378,29 +410,17 @@
         if (!currentDrive) return;
         const name = prompt("New folder name:");
         if (!name || !name.trim()) return;
-        try {
-            const res = await fetch("/api/files/mkdir", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    server_id: currentDrive.server_id,
-                    path: currentPath,
-                    name: name.trim()
-                })
-            });
-            const data = await res.json();
-            if (!data.ok) throw new Error(data.error);
-            navigateToPath(currentPath);
-        } catch (err) {
-            if (window.DWSNotifications) {
-                window.DWSNotifications.push({
-                    title: "Create Folder Failed",
-                    icon: "⚠",
-                    type: "error",
-                    message: err.message
-                });
-            }
-        }
+        const res = await fetch("/api/files/mkdir", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                server_id: currentDrive.server_id,
+                path: currentPath,
+                name: name.trim()
+            })
+        });
+        const data = await res.json();
+        if (data.ok) navigateToPath(currentPath);
     });
 
     downloadBtn.addEventListener("click", () => {
@@ -411,45 +431,23 @@
 
     deleteBtn.addEventListener("click", async () => {
         if (!currentDrive || !selectedItem) return;
-        if (!confirm(`Delete "${selectedItem.name}" from ${currentDrive.server_name}?`)) return;
-        try {
-            const res = await fetch("/api/files/delete", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    server_id: currentDrive.server_id,
-                    path: selectedItem.path,
-                    is_dir: selectedItem.is_dir
-                })
-            });
-            const data = await res.json();
-            if (!data.ok) throw new Error(data.error);
-            navigateToPath(currentPath);
-        } catch (err) {
-            if (window.DWSNotifications) {
-                window.DWSNotifications.push({
-                    title: "Delete Failed",
-                    icon: "⚠",
-                    type: "error",
-                    message: err.message
-                });
-            }
-        }
-    });
-
-    // Quick SSH Terminal Launcher buttons
-    document.querySelectorAll("[data-shell-id]").forEach((btn) => {
-        btn.addEventListener("click", () => {
-            const sid = btn.dataset.shellId;
-            if (typeof window.openCustomIframe === "function") {
-                window.openCustomIframe(`SSH Terminal · Server ${sid}`, `/shell/${sid}`, btn);
-            } else {
-                window.open(`/shell/${sid}`, "_blank");
-            }
+        if (!confirm(`Delete "${selectedItem.name}"?`)) return;
+        const res = await fetch("/api/files/delete", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                server_id: currentDrive.server_id,
+                path: selectedItem.path,
+                is_dir: selectedItem.is_dir
+            })
         });
+        const data = await res.json();
+        if (data.ok) navigateToPath(currentPath);
     });
 
-    // Initial load + automatic background drive hotplug polling every 15s
+    window.reloadDWSDrives = () => loadDrives(false);
+    window.getLatestDWSDrives = () => latestDrives;
+
     window.addEventListener("DOMContentLoaded", () => {
         loadDrives(false);
         setInterval(() => {

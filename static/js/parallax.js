@@ -9,6 +9,8 @@
     let tick = 0;
     let rafId = null;
 
+    window.dwsParallaxIntensity = 28;
+
     window.addEventListener("mousemove", (e) => {
         targetX = (e.clientX / window.innerWidth - 0.5) * 2;
         targetY = (e.clientY / window.innerHeight - 0.5) * 2;
@@ -26,23 +28,23 @@
             rafId = null;
             return;
         }
-        tick += 0.012;
-        currentX += (targetX - currentX) * 0.075;
-        currentY += (targetY - currentY) * 0.075;
+        tick += 0.014;
+        currentX += (targetX - currentX) * 0.08;
+        currentY += (targetY - currentY) * 0.08;
+
+        const scale = (window.dwsParallaxIntensity !== undefined ? window.dwsParallaxIntensity : 28) / 28;
 
         layers.forEach((layer) => {
-            const depth = parseFloat(layer.dataset.depth || 0.05);
+            const depth = parseFloat(layer.dataset.depth || 0.04) * scale;
             const moveX = -currentX * (window.innerWidth * depth);
             const moveY = -currentY * (window.innerHeight * depth);
-            layer.style.transform = `translate3d(${moveX.toFixed(2)}px, ${moveY.toFixed(2)}px, 0)`;
+            layer.style.transform = `translate3d(${moveX.toFixed(1)}px, ${moveY.toFixed(1)}px, 0)`;
         });
 
         if (orb1 && orb2 && orb3) {
-            orb1.setAttribute("cx", (550 + Math.sin(tick) * 90).toFixed(1));
-            orb1.setAttribute("cy", (380 + Math.cos(tick * 0.8) * 70).toFixed(1));
-            orb2.setAttribute("cx", (1350 + Math.cos(tick * 0.9) * 110).toFixed(1));
-            orb2.setAttribute("cy", (700 + Math.sin(tick * 0.7) * 85).toFixed(1));
-            orb3.setAttribute("cx", (960 + Math.sin(tick * 1.1) * 75).toFixed(1));
+            orb1.style.transform = `translate3d(${(Math.sin(tick) * 75).toFixed(1)}px, ${(Math.cos(tick * 0.8) * 55).toFixed(1)}px, 0)`;
+            orb2.style.transform = `translate3d(${(Math.cos(tick * 0.9) * 85).toFixed(1)}px, ${(Math.sin(tick * 0.7) * 65).toFixed(1)}px, 0)`;
+            orb3.style.transform = `translate3d(${(Math.sin(tick * 1.1) * 60).toFixed(1)}px, ${(Math.cos(tick * 0.6) * 50).toFixed(1)}px, 0)`;
         }
 
         rafId = requestAnimationFrame(animateParallax);

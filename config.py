@@ -18,24 +18,30 @@ UPDATE_CHECK_INTERVAL = 30  # Seconds between remote hash checks
 
 ALLOWED_EXTENSIONS = {"png", "svg", "jpg", "jpeg", "webp", "gif"}
 
-# Multi-Server SSH / SFTP Configuration
-SERVERS = {
+# Default Seed Servers (Stored & editable inside data/settings.json)
+DEFAULT_SERVERS = {
     "1": {
+        "id": "1",
         "name": "Server 1 (Win)",
         "host": "192.168.2.143",
         "user": "dylan",
         "password": os.environ.get("DWS_SRV1_PASS", "weqr1234"),
+        "shell_url": "https://device.teamexist.com/shell/1",
     },
     "2": {
+        "id": "2",
         "name": "Server 2 (Win)",
         "host": "192.168.2.91",
         "user": "dylanwardstudios",
         "password": os.environ.get("DWS_SRV2_PASS", "weqr1234"),
+        "shell_url": "https://device.teamexist.com/shell/2",
     },
     "3": {
+        "id": "3",
         "name": "Server 3 (Pi)",
         "host": "192.168.2.134",
         "user": "dylan",
         "password": os.environ.get("DWS_SRV3_PASS", "sIjkew-1qixwe-sogcog"),
+        "shell_url": "https://device.teamexist.com/shell/3",
     },
 }

@@ -1,5 +1,8 @@
+import json
 import time
 import uuid
+import urllib.request
+import urllib.error
 from flask import Blueprint, render_template, jsonify, request, make_response, redirect
 from core.storage import StorageManager
 
@@ -21,7 +24,6 @@ def index():
 
 @blueprint.route("/shell/<server_id>")
 def shell_redirect(server_id):
-    """Fallback redirect if anything hits /shell/<id> locally."""
     settings = StorageManager.load_settings()
     srv = settings.get("servers", {}).get(str(server_id), {})
     target = srv.get("shell_url") or f"https://device.teamexist.com/shell/{server_id}"
@@ -60,11 +62,72 @@ def update_ui_settings():
         for num_key in ("glass_blur", "parallax_intensity"):
             if num_key in data:
                 ui[num_key] = int(data[num_key])
+        if isinstance(data.get("custom_theme"), dict):
+            ui.setdefault("custom_theme", {}).update(data["custom_theme"])
+        if isinstance(data.get("saved_themes"), list):
+            ui["saved_themes"] = data["saved_themes"]
 
         StorageManager.save_settings(settings)
         return jsonify({"ok": True, "settings": StorageManager.get_public_settings()})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
+
+
+@blueprint.route("/api/octoprint/config", methods=["POST"])
+def save_octoprint_config():
+    try:
+        data = request.get_json(silent=True) or {}
+        settings = StorageManager.load_settings()
+        octo = settings.setdefault("octoprint", {})
+
+        octo["enabled"] = bool(data.get("enabled", True))
+        if "url" in data and data["url"].strip():
+            octo["url"] = data["url"].strip().rstrip("/")
+        if "api_key" in data and data["api_key"].strip():
+            octo["api_key"] = data["api_key"].strip()
+
+        StorageManager.save_settings(settings)
+        return jsonify({"ok": True, "settings": StorageManager.get_public_settings()})
+    except Exception as e:
+        return jsonify({"ok": False, "error": str(e)}), 400
+
+
+@blueprint.route("/api/octoprint/status", methods=["GET"])
+def get_octoprint_status():
+    settings = StorageManager.load_settings()
+    octo = settings.get("octoprint", {})
+    if not octo.get("enabled") or not octo.get("url") or not octo.get("api_key"):
+        return jsonify({"ok": False, "enabled": False})
+
+    target_url = f"{octo['url'].rstrip('/')}/api/job"
+    req = urllib.request.Request(
+        target_url,
+        headers={
+            "X-Api-Key": octo["api_key"],
+            "Accept": "application/json"
+        }
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=3.0) as resp:
+            raw = json.loads(resp.read().decode("utf-8", errors="replace"))
+        state_str = str(raw.get("state") or "Offline")
+        prog = raw.get("progress") or {}
+        job = raw.get("job") or {}
+        file_info = job.get("file") or {}
+
+        is_printing = any(k in state_str for k in ("Printing", "Paused", "Starting"))
+        return jsonify({
+            "ok": True,
+            "enabled": True,
+            "state": state_str,
+            "is_printing": is_printing,
+            "file_name": file_info.get("display") or file_info.get("name") or "Active Print Job",
+            "completion": round(float(prog.get("completion") or 0.0), 1),
+            "print_time": int(prog.get("printTime") or 0),
+            "print_time_left": prog.get("printTimeLeft")
+        })
+    except Exception as e:
+        return jsonify({"ok": False, "enabled": True, "error": str(e)})
 
 
 @blueprint.route("/api/apps", methods=["POST"])
@@ -89,7 +152,7 @@ def add_app():
             "url": url,
             "icon": icon_url or "",
             "iframe": launch_mode != "tab",
-            "launch_mode": launch_mode,  # "center", "dropdown", or "tab"
+            "launch_mode": launch_mode,
             "subject_type": subject_type
         }
         settings.setdefault("apps", []).append(new_app)
@@ -169,7 +232,6 @@ def update_background():
 
 @blueprint.route("/api/servers", methods=["POST"])
 def save_or_add_server():
-    """Add a new server (e.g. 4th server) or update/rename an existing server."""
     try:
         data = request.get_json(silent=True) or {}
         settings = StorageManager.load_settings()
@@ -217,7 +279,6 @@ def delete_server(server_id):
 
 @blueprint.route("/api/drives/alias", methods=["POST"])
 def set_drive_alias():
-    """Renames a drive locally on the DWSConnect server so all web users see the custom name."""
     try:
         data = request.get_json(silent=True) or {}
         drive_id = (data.get("drive_id") or "").strip()

@@ -5,9 +5,47 @@
     const clearBtn = document.getElementById("btn-clear-notifs");
     const filterTabs = document.querySelectorAll(".notif-tab");
 
+    const ORDER_STORAGE_KEY = "dws_pinned_notif_order_v1";
+    const COLLAPSE_STORAGE_KEY = "dws_notif_collapsed_v1";
+
     const modules = new Map();
     const activeTimers = new Map();
     let currentFilter = "all";
+    let draggedCard = null;
+
+    function getCollapsedSet() {
+        try {
+            return new Set(JSON.parse(localStorage.getItem(COLLAPSE_STORAGE_KEY) || "[]"));
+        } catch (e) {
+            return new Set();
+        }
+    }
+
+    function saveCollapsedSet(setObj) {
+        try {
+            localStorage.setItem(COLLAPSE_STORAGE_KEY, JSON.stringify([...setObj]));
+        } catch (e) {}
+    }
+
+    function savePinnedOrder() {
+        try {
+            const ids = Array.from(pinnedContainer.children).map((el) => el.id);
+            localStorage.setItem(ORDER_STORAGE_KEY, JSON.stringify(ids));
+        } catch (e) {}
+    }
+
+    function applySavedPinnedOrder() {
+        try {
+            const savedOrder = JSON.parse(localStorage.getItem(ORDER_STORAGE_KEY) || "[]");
+            if (!savedOrder.length) return;
+            savedOrder.forEach((id) => {
+                const el = document.getElementById(id);
+                if (el && el.parentElement === pinnedContainer) {
+                    pinnedContainer.appendChild(el);
+                }
+            });
+        } catch (e) {}
+    }
 
     function updateBadgeCount() {
         const total = pinnedContainer.children.length + dynamicContainer.children.length;
@@ -40,6 +78,48 @@
         tab.addEventListener("click", () => applyFilter(tab.dataset.filter));
     });
 
+    function enableCardDragAndDrop(card) {
+        card.setAttribute("draggable", "true");
+
+        card.addEventListener("dragstart", (e) => {
+            draggedCard = card;
+            card.classList.add("dragging");
+            e.dataTransfer.effectAllowed = "move";
+        });
+
+        card.addEventListener("dragend", () => {
+            card.classList.remove("dragging");
+            document.querySelectorAll(".notif-card.drag-over-card").forEach((c) => c.classList.remove("drag-over-card"));
+            draggedCard = null;
+            savePinnedOrder();
+        });
+
+        card.addEventListener("dragover", (e) => {
+            e.preventDefault();
+            if (!draggedCard || draggedCard === card || card.parentElement !== pinnedContainer) return;
+            card.classList.add("drag-over-card");
+        });
+
+        card.addEventListener("dragleave", () => {
+            card.classList.remove("drag-over-card");
+        });
+
+        card.addEventListener("drop", (e) => {
+            e.preventDefault();
+            card.classList.remove("drag-over-card");
+            if (!draggedCard || draggedCard === card || card.parentElement !== pinnedContainer) return;
+            const children = Array.from(pinnedContainer.children);
+            const draggedIdx = children.indexOf(draggedCard);
+            const targetIdx = children.indexOf(card);
+            if (draggedIdx < targetIdx) {
+                pinnedContainer.insertBefore(draggedCard, card.nextSibling);
+            } else {
+                pinnedContainer.insertBefore(draggedCard, card);
+            }
+            savePinnedOrder();
+        });
+    }
+
     function pushNotification(opts = {}) {
         const id = opts.id || `notif-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`;
         const type = opts.videoUrl ? "video" : (opts.type || "info");
@@ -48,17 +128,23 @@
 
         removeNotification(id);
 
+        const collapsedSet = getCollapsedSet();
         const card = document.createElement("div");
-        card.className = `notif-card type-${type}`;
+        card.className = `notif-card type-${type}${collapsedSet.has(id) ? " collapsed" : ""}`;
         card.id = id;
         card.dataset.notifType = type;
 
         const header = document.createElement("div");
         header.className = "notif-card-header";
+        header.title = "Click header to shrink/expand · Drag to reorder";
 
         const titleEl = document.createElement("div");
         titleEl.className = "notif-card-title";
-        titleEl.innerHTML = `<span>${opts.icon || "✦"}</span> <span>${opts.title || "Notification"}</span>`;
+        titleEl.innerHTML = `
+            <span class="notif-collapse-chevron">▾</span>
+            <span>${opts.icon || "✦"}</span>
+            <span>${opts.title || "Notification"}</span>
+        `;
 
         const metaRight = document.createElement("div");
         metaRight.className = "notif-meta-right";
@@ -80,6 +166,16 @@
 
         header.appendChild(titleEl);
         header.appendChild(metaRight);
+
+        // Click top header to shrink/expand notification
+        header.addEventListener("click", (e) => {
+            if (e.target.closest("button")) return;
+            card.classList.toggle("collapsed");
+            const currentSet = getCollapsedSet();
+            if (card.classList.contains("collapsed")) currentSet.add(id);
+            else currentSet.delete(id);
+            saveCollapsedSet(currentSet);
+        });
 
         const body = document.createElement("div");
         body.className = "notif-body";
@@ -110,7 +206,9 @@
         card.appendChild(body);
 
         if (pinned) {
+            enableCardDragAndDrop(card);
             pinnedContainer.appendChild(card);
+            applySavedPinnedOrder();
         } else {
             dynamicContainer.prepend(card);
         }
@@ -191,7 +289,7 @@
     });
 
     // =========================================================================
-    // LIVE MODULE 1: CLEAN, UNSOPHISTICATED CLOCK & DATE
+    // LIVE MODULE 1: CLEAN CLOCK & DATE
     // =========================================================================
     registerModule({
         id: "live-datetime",
@@ -229,7 +327,7 @@
     });
 
     // =========================================================================
-    // LIVE MODULE 2: SERVER CLUSTER STATUS (CLICK TO MANAGE / ADD 4TH+ SERVER)
+    // LIVE MODULE 2: SERVER CLUSTER STATUS
     // =========================================================================
     let clusterListEl = null;
     let clusterPillEl = null;
@@ -246,7 +344,6 @@
             const addSrvBtn = document.createElement("button");
             addSrvBtn.className = "glass-icon-btn";
             addSrvBtn.textContent = "+ Add / Edit";
-            addSrvBtn.title = "Dynamically Add or Rename Servers";
             addSrvBtn.onclick = (e) => {
                 e.stopPropagation();
                 if (typeof window.openSettingsToTab === "function") {
@@ -273,7 +370,6 @@
         entries.forEach((srv) => {
             const row = document.createElement("div");
             row.className = "cluster-node-row";
-            row.title = "Click to open SSH Terminal, or right-click to rename/edit server";
             const dotColor = srv.online ? "#34d399" : "#f87171";
             const metaText = srv.online
                 ? `${srv.drive_count || 0} Disks · ${srv.latency_ms || 1}ms`
@@ -304,13 +400,6 @@
                     });
                 } else {
                     window.open(shellUrl, "_blank");
-                }
-            });
-
-            row.addEventListener("contextmenu", (e) => {
-                e.preventDefault();
-                if (typeof window.openSettingsToTab === "function") {
-                    window.openSettingsToTab("tab-servers", srv.id);
                 }
             });
 
@@ -431,19 +520,102 @@
             }
 
             canvas.style.cursor = "pointer";
-            canvas.title = "Click to run burst speed test";
             canvas.addEventListener("click", () => sampleConnection(true));
-
             sampleConnection(true);
             setInterval(() => sampleConnection(false), 2200);
         }
     });
+
+    // =========================================================================
+    // LIVE MODULE 4: OCTOPRINT LIVE PRINT PROGRESS & 5-SECOND COMPLETION BANNER
+    // =========================================================================
+    let wasPrinting = false;
+
+    function formatDurationSec(sec) {
+        if (sec === null || sec === undefined || sec < 0) return "Calculating...";
+        const hrs = Math.floor(sec / 3600);
+        const mins = Math.floor((sec % 3600) / 60);
+        const s = Math.floor(sec % 60);
+        if (hrs > 0) return `${hrs}h ${mins}m ${s}s left`;
+        if (mins > 0) return `${mins}m ${s}s left`;
+        return `${s}s left`;
+    }
+
+    async function pollOctoPrint() {
+        if (document.hidden) return;
+        try {
+            const res = await fetch("/api/octoprint/status");
+            const data = await res.json();
+            if (!data.ok || !data.enabled) {
+                removeNotification("octoprint-live-job");
+                return;
+            }
+
+            if (data.is_printing) {
+                wasPrinting = true;
+                const pct = data.completion || 0;
+                const etaText = formatDurationSec(data.print_time_left);
+
+                let existing = document.getElementById("octoprint-live-job");
+                if (!existing) {
+                    pushNotification({
+                        id: "octoprint-live-job",
+                        title: "OctoPrint · Printing",
+                        icon: "🖨",
+                        type: "live",
+                        pinned: true,
+                        dismissible: false,
+                        renderCustom(bodyEl, timerPill) {
+                            timerPill.classList.remove("hidden");
+                            timerPill.id = "octo-eta-pill";
+                            bodyEl.innerHTML = `
+                                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;">
+                                    <strong id="octo-job-name"></strong>
+                                    <span id="octo-job-pct"></span>
+                                </div>
+                                <div class="drive-meter-track">
+                                    <div class="drive-meter-fill" id="octo-job-bar" style="width:0%"></div>
+                                </div>
+                            `;
+                        }
+                    });
+                }
+                const pill = document.getElementById("octo-eta-pill");
+                const nameEl = document.getElementById("octo-job-name");
+                const pctEl = document.getElementById("octo-job-pct");
+                const barEl = document.getElementById("octo-job-bar");
+                if (pill) pill.textContent = etaText;
+                if (nameEl) nameEl.textContent = data.file_name;
+                if (pctEl) pctEl.textContent = `${pct}%`;
+                if (barEl) barEl.style.width = `${Math.min(100, pct)}%`;
+            } else if (wasPrinting && (data.completion >= 99.5 || data.state === "Operational")) {
+                // Print just finished! Show completion banner for 5 seconds then remove
+                wasPrinting = false;
+                removeNotification("octoprint-live-job");
+                pushNotification({
+                    id: "octoprint-done-banner",
+                    title: "3D Print Finished!",
+                    icon: "✅",
+                    type: "success",
+                    message: `${data.file_name || "Print job"} completed (100%).`,
+                    timerSeconds: 5,
+                    autoDismiss: true
+                });
+            } else {
+                removeNotification("octoprint-live-job");
+            }
+        } catch (e) {}
+    }
+
+    setInterval(pollOctoPrint, 4000);
+    setTimeout(pollOctoPrint, 1200);
 
     window.DWSNotifications = {
         push: pushNotification,
         remove: removeNotification,
         registerModule,
         updateServerClusterCard,
+        pollOctoPrint,
         pushVideoStream(title, videoUrl, videoType = "video", pinned = false) {
             return pushNotification({
                 title,

@@ -1,5 +1,5 @@
 (function () {
-    const DURATION_MS = 2250;
+    const DURATION_MS = 650; // Snappy 0.65s full animation on every open & refresh
     const FPS = 60;
     const TOTAL_FRAMES = Math.round((DURATION_MS / 1000) * FPS);
     const BOOT_SVG_PATH = "/static/assets/boot.svg";
@@ -28,22 +28,14 @@
         </svg>
     `;
 
-    function maxWait(promise, ms = 500) {
+    function maxWait(promise, ms = 320) {
         return Promise.race([
             promise,
             new Promise((resolve) => setTimeout(resolve, ms))
         ]);
     }
 
-    function isPageReload() {
-        try {
-            const nav = performance.getEntriesByType("navigation")[0];
-            if (nav && nav.type === "reload") return true;
-        } catch (e) {}
-        return sessionStorage.getItem("dws_boot_seen") === "1";
-    }
-
-    function restartSvgAnimations(svg) {
+    function restartAndAccelerateSvg(svg) {
         if (!svg) return;
         svg.style.animationPlayState = "running";
         svg.querySelectorAll("*").forEach((el) => {
@@ -59,6 +51,7 @@
             svg.getAnimations({ subtree: true }).forEach((anim) => {
                 try {
                     anim.cancel();
+                    anim.playbackRate = 3.2; // Accelerate internal SVG keyframes to match 650ms boot
                     anim.play();
                     anim.currentTime = 0;
                 } catch (e) {}
@@ -66,67 +59,34 @@
         }
     }
 
-    function seekSvgToFinalFrame(svg) {
-        if (!svg) return;
-        if (typeof svg.setCurrentTime === "function") {
-            try {
-                svg.unpauseAnimations();
-                svg.setCurrentTime(DURATION_MS / 1000);
-                svg.pauseAnimations();
-            } catch (e) {}
-        }
-        if (typeof svg.getAnimations === "function") {
-            svg.getAnimations({ subtree: true }).forEach((anim) => {
-                try {
-                    anim.play();
-                    anim.currentTime = DURATION_MS;
-                    anim.pause();
-                } catch (e) {}
-            });
-        }
-        const fbRect = document.getElementById("fallback-squircle");
-        if (fbRect) fbRect.style.strokeDashoffset = "0";
-    }
-
-    function revealWorkspace(fast = false) {
-        sessionStorage.setItem("dws_boot_seen", "1");
-
-        seekSvgToFinalFrame(svgElement);
-
+    function revealWorkspace() {
         if (brandHeader) {
-            if (fast) brandHeader.classList.add("fast-boot");
             brandHeader.classList.remove("state-booting");
             brandHeader.classList.add("state-docked");
         }
 
         if (curtain) {
-            if (fast) curtain.classList.add("fast-boot");
             curtain.classList.add("fade-away");
         }
-
-        const gridDelay = fast ? 30 : 220;
-        const iconDelay = fast ? 90 : 520;
 
         setTimeout(() => {
             if (appGrid) appGrid.classList.add("box-open-x");
             sidePanels.forEach((p) => p.classList.add("panel-revealed"));
-        }, gridDelay);
+        }, 90);
 
         setTimeout(() => {
             if (typeof window.recalculateTopToBottomStagger === "function") {
                 window.recalculateTopToBottomStagger();
             }
             if (appGrid) appGrid.classList.add("icons-revealed");
-        }, iconDelay);
+        }, 240);
     }
 
-    async function initBootSequence(forceFull = false) {
-        const fastBoot = !forceFull && isPageReload();
-
+    async function initBootSequence() {
         let svgCode = FALLBACK_SVG;
         try {
             const controller = new AbortController();
-            const timer = setTimeout(() => controller.abort(), 450);
+            const timer = setTimeout(() => controller.abort(), 300);
             const res = await fetch(BOOT_SVG_PATH, { signal: controller.signal });
             clearTimeout(timer);
             if (res.ok) svgCode = await res.text();
@@ -135,14 +95,9 @@
         container.innerHTML = svgCode;
         svgElement = container.querySelector("svg");
 
-        await maxWait(window.dashboardReadyPromise || Promise.resolve(), 450);
+        await maxWait(window.dashboardReadyPromise || Promise.resolve(), 300);
 
-        if (fastBoot) {
-            revealWorkspace(true);
-            return;
-        }
-
-        restartSvgAnimations(svgElement);
+        restartAndAccelerateSvg(svgElement);
         startTime = null;
         lastRenderedFrame = -1;
         requestAnimationFrame(stepBootAnimation);
@@ -160,6 +115,12 @@
                 brandHeader.style.setProperty("--boot-progress", progress.toFixed(4));
                 brandHeader.style.setProperty("--boot-frame", currentFrame);
             }
+            if (svgElement && typeof svgElement.setCurrentTime === "function") {
+                // Scrub SMIL timeline proportionally across 2.45s native duration inside 0.65s
+                try {
+                    svgElement.setCurrentTime(progress * 2.45);
+                } catch (e) {}
+            }
             const fbRect = document.getElementById("fallback-squircle");
             if (fbRect) {
                 fbRect.style.strokeDashoffset = (320 * (1 - progress)).toFixed(2);
@@ -169,7 +130,7 @@
         if (elapsed < DURATION_MS) {
             requestAnimationFrame(stepBootAnimation);
         } else {
-            revealWorkspace(false);
+            revealWorkspace();
         }
     }
 
@@ -177,14 +138,14 @@
     if (replayBtn) {
         replayBtn.addEventListener("click", () => {
             document.getElementById("settings-modal").classList.add("hidden");
-            curtain.classList.remove("fast-boot", "fade-away");
-            brandHeader.classList.remove("fast-boot", "state-docked");
+            curtain.classList.remove("fade-away");
+            brandHeader.classList.remove("state-docked");
             brandHeader.classList.add("state-booting");
             appGrid.classList.remove("box-open-x", "icons-revealed");
             sidePanels.forEach((p) => p.classList.remove("panel-revealed"));
-            initBootSequence(true);
+            initBootSequence();
         });
     }
 
-    initBootSequence(false);
+    initBootSequence();
 })();

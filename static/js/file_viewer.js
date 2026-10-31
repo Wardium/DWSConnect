@@ -38,15 +38,18 @@
 
     function renderServerShellButtons(serversMap) {
         if (!serverShellBar) return;
-        serverShellBar.innerHTML = `<span class="shell-bar-label">SSH Shell:</span>`;
+        serverShellBar.innerHTML = "";
         Object.values(serversMap || {}).forEach((srv) => {
             const btn = document.createElement("button");
             btn.className = "glass-pill-btn";
-            btn.textContent = srv.name || `Srv ${srv.id}`;
-            btn.title = `Connect SSH: ${srv.shell_url || "https://device.teamexist.com/shell/" + srv.id}`;
+            btn.textContent = `⌘ ${srv.name || "Srv " + srv.id}`;
+            btn.title = `Open SSH Terminal: ${srv.shell_url || "https://device.teamexist.com/shell/" + srv.id}`;
             btn.addEventListener("click", () => {
                 const targetUrl = srv.shell_url || `https://device.teamexist.com/shell/${srv.id}`;
                 if (typeof window.openCenterStageApp === "function") {
+                    if (typeof window.switchMobilePane === "function") {
+                        window.switchMobilePane("center");
+                    }
                     window.openCenterStageApp({
                         name: `${srv.name} — SSH Shell`,
                         url: targetUrl,
@@ -111,7 +114,7 @@
     async function promptDriveRename(drive, e) {
         if (e) e.stopPropagation();
         const nextName = prompt(
-            `Enter a new server-wide display name for ${drive.original_label} on ${drive.server_name} (leave empty to reset):`,
+            `Enter a server-wide display name for ${drive.original_label} on ${drive.server_name} (leave empty to reset):`,
             drive.alias || drive.label
         );
         if (nextName === null) return;
@@ -188,7 +191,7 @@
                             <div class="drive-icon">⚠</div>
                             <div>
                                 <div class="drive-name">${info.name} (${info.host})</div>
-                                <div class="drive-server-sub">SSH Offline — Click to open terminal or settings</div>
+                                <div class="drive-server-sub">SSH Offline — Click to configure</div>
                             </div>
                         </div>
                     </div>
@@ -203,14 +206,23 @@
         });
     }
 
-    async function openDrive(drive) {
+    async function openDrive(drive, customStartPath = null) {
         currentDrive = drive;
         panelTitle.textContent = drive.label;
         backToDrivesBtn.classList.remove("hidden");
         drivesListView.classList.add("hidden");
         fileBrowserView.classList.remove("hidden");
-        await navigateToPath(drive.sftp_root);
+        await navigateToPath(customStartPath || drive.sftp_root);
     }
+
+    window.openDriveAndPath = async function (driveId, folderPath) {
+        const targetDrive = latestDrives.find((d) => d.id === driveId);
+        if (!targetDrive) return;
+        if (typeof window.switchMobilePane === "function") {
+            window.switchMobilePane("drives");
+        }
+        await openDrive(targetDrive, folderPath);
+    };
 
     function closeDriveToOverview() {
         currentDrive = null;
@@ -365,14 +377,6 @@
             loadDrives(true);
         } catch (err) {
             if (notif) window.DWSNotifications.remove(notif.id);
-            if (window.DWSNotifications) {
-                window.DWSNotifications.push({
-                    title: "Upload Error",
-                    icon: "⚠",
-                    type: "error",
-                    message: err.message
-                });
-            }
         }
     }
 

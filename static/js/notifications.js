@@ -1,3 +1,21 @@
+/*
+
+Example Notification
+
+window.DWSNotifications.registerModule({
+    id: "server-health",
+    title: "Cluster Watchdog",
+    icon: "🖥",
+    init(bodyEl, timerPill) {
+        timerPill.classList.remove("hidden");
+        timerPill.textContent = "Polling";
+        bodyEl.innerHTML = `<div>All 3 nodes nominal.</div>`;
+    }
+});
+
+
+*/
+
 (function () {
     const pinnedContainer = document.getElementById("notif-pinned-section");
     const dynamicContainer = document.getElementById("notif-dynamic-section");

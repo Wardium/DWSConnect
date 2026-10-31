@@ -39,8 +39,15 @@
         <div class="parallax-layer ambient-grid" data-depth="0.05"></div>
     </div>
 
+    <!-- PHONE / PORTRAIT TOP PANE SWITCHER (DEFAULTS TO MIDDLE PANE) -->
+    <nav id="mobile-pane-switcher" class="mobile-pane-switcher" aria-label="Workspace Section Switcher">
+        <button class="mobile-switch-btn" data-mobile-pane="drives">💽 Drives</button>
+        <button class="mobile-switch-btn active" data-mobile-pane="center">✦ Workspace</button>
+        <button class="mobile-switch-btn" data-mobile-pane="notifs">🔔 Alerts</button>
+    </nav>
+
     <!-- 3. THREE-COLUMN LIQUID WORKSPACE -->
-    <main id="workspace">
+    <main id="workspace" data-mobile-active="center">
         <!-- LEFT SECTION: MULTI-SERVER DRIVE & SFTP FILE VIEWER -->
         <aside id="left-file-panel" class="liquid-side-panel">
             <div class="panel-header">
@@ -59,7 +66,7 @@
                 </div>
             </div>
 
-            <!-- Dynamic Server SSH Quick Bar -->
+            <!-- Single-Row Dynamic Server SSH Quick Bar -->
             <div class="server-shell-bar" id="server-shell-bar"></div>
 
             <!-- View A: All Connected Drives List -->
@@ -93,21 +100,26 @@
             </div>
         </aside>
 
-        <!-- CENTER SECTION: FULL-WIDTH SEARCH BAR + APP GRID + EXPANDING INLINE IFRAME STAGE -->
+        <!-- CENTER SECTION: FULL-WIDTH SEARCH BAR + SHALLOW FILE RESULTS + APP GRID + EXPANDING STAGE -->
         <section id="center-column">
-            <div class="center-search-bar">
-                <span class="search-sparkle-icon">✦</span>
-                <input
-                    type="text"
-                    id="app-search-input"
-                    class="glass-search-input"
-                    placeholder="Search apps, servers, or press '/' to filter..."
-                    autocomplete="off"
-                />
-                <span id="time-slot-pill" class="time-slot-pill hidden" title="Active Time-of-Day Wallpaper"></span>
-                <button id="settings-trigger" class="search-corner-settings-btn" title="Workspace Settings & Customization">
-                    ⚙
-                </button>
+            <div class="center-search-wrapper">
+                <div class="center-search-bar">
+                    <span class="search-sparkle-icon">✦</span>
+                    <input
+                        type="text"
+                        id="app-search-input"
+                        class="glass-search-input"
+                        placeholder="Search apps & server files, or press '/'..."
+                        autocomplete="off"
+                    />
+                    <span id="time-slot-pill" class="time-slot-pill hidden" title="Active Time-of-Day Wallpaper"></span>
+                    <button id="settings-trigger" class="search-corner-settings-btn" title="Workspace Settings & Customization">
+                        ⚙
+                    </button>
+                </div>
+
+                <!-- Quick Shallow File Search Results Popover -->
+                <div id="quick-file-search-results" class="quick-file-results hidden"></div>
             </div>
 
             <!-- App Grid -->
@@ -155,6 +167,7 @@
                 </div>
 
                 <div id="notif-scroll-feed" class="panel-scroll-body">
+                    <div class="notif-sort-hint">Drag live cards to reorder · Click header to shrink</div>
                     <div id="notif-pinned-section" class="notif-section-stack"></div>
                     <div id="notif-dynamic-section" class="notif-section-stack"></div>
                 </div>
@@ -196,11 +209,12 @@
             <!-- Settings Navigation Tabs -->
             <div class="settings-nav-tabs">
                 <button class="settings-tab-btn active" data-tab="tab-apps">Apps & Widgets</button>
+                <button class="settings-tab-btn" data-tab="tab-appearance">Theme Studio</button>
+                <button class="settings-tab-btn" data-tab="tab-octoprint">OctoPrint</button>
                 <button class="settings-tab-btn" data-tab="tab-servers">Servers & SSH</button>
                 <button class="settings-tab-btn" data-tab="tab-drives">Drive Names</button>
                 <button class="settings-tab-btn" data-tab="tab-wallpapers">Wallpapers & Time</button>
-                <button class="settings-tab-btn" data-tab="tab-appearance">Theme & Liquid FX</button>
-                <button class="settings-tab-btn" data-tab="tab-video">Live Video Feed</button>
+                <button class="settings-tab-btn" data-tab="tab-video">Live Video</button>
             </div>
 
             <div class="modal-body">
@@ -232,11 +246,105 @@
                     </form>
 
                     <div class="settings-divider"></div>
-                    <h4>Installed Applications (Click Launch Mode to Change)</h4>
+                    <h4>Installed Applications</h4>
                     <div id="settings-app-list" class="settings-item-list"></div>
                 </div>
 
-                <!-- TAB 2: SERVERS & SSH CONFIGURATION -->
+                <!-- TAB 2: THEME STUDIO & CUSTOM THEME CREATOR -->
+                <div id="tab-appearance" class="settings-tab-pane hidden">
+                    <div class="glass-form">
+                        <h4>Preset Mode & Spectrum</h4>
+                        <div class="form-grid-2">
+                            <label class="select-label">
+                                <span>Mode:</span>
+                                <select id="ui-theme-select" class="glass-select">
+                                    <option value="auto">Dynamic Auto (OS Dark/Light)</option>
+                                    <option value="dark">Liquid Dark Mode</option>
+                                    <option value="light">Frosted Light Mode</option>
+                                    <option value="custom">Custom Built Theme</option>
+                                </select>
+                            </label>
+
+                            <label class="select-label">
+                                <span>Accent:</span>
+                                <select id="ui-accent-select" class="glass-select">
+                                    <option value="aurora">Aurora Cyan & Violet</option>
+                                    <option value="emerald">Emerald Matrix & Mint</option>
+                                    <option value="plasma">Sunset Plasma Pink</option>
+                                    <option value="crimson">Crimson Redline</option>
+                                    <option value="solar">Solar Gold & Blue</option>
+                                    <option value="custom">Use Custom Colors Below</option>
+                                </select>
+                            </label>
+                        </div>
+
+                        <div class="settings-divider"></div>
+                        <h4>Custom Theme Builder (Live Preview)</h4>
+                        <div class="custom-theme-color-grid">
+                            <label class="color-picker-card">
+                                <span>Background Base</span>
+                                <input type="color" id="ct-bg-base" value="#070b19" />
+                            </label>
+                            <label class="color-picker-card">
+                                <span>Text Color</span>
+                                <input type="color" id="ct-text-main" value="#ffffff" />
+                            </label>
+                            <label class="color-picker-card">
+                                <span>Primary Glow</span>
+                                <input type="color" id="ct-accent-1" value="#38bdf8" />
+                            </label>
+                            <label class="color-picker-card">
+                                <span>Secondary Glow</span>
+                                <input type="color" id="ct-accent-2" value="#a855f7" />
+                            </label>
+                            <label class="color-picker-card">
+                                <span>Tertiary Glow</span>
+                                <input type="color" id="ct-accent-3" value="#ec4899" />
+                            </label>
+                        </div>
+
+                        <div class="form-grid-2" style="margin-top:6px;">
+                            <input type="text" id="custom-theme-name" placeholder="Theme Name (e.g. Wedgewood Blue)" />
+                            <button type="button" id="btn-save-custom-preset" class="glass-action-btn primary">
+                                + Save to My Themes
+                            </button>
+                        </div>
+
+                        <div id="saved-custom-themes-list" class="saved-themes-pills"></div>
+
+                        <div class="settings-divider"></div>
+                        <label class="range-label">
+                            <span>Liquid Glass Blur (<strong id="blur-val-label">24px</strong>):</span>
+                            <input type="range" id="ui-blur-range" min="8" max="44" value="24" />
+                        </label>
+
+                        <label class="range-label">
+                            <span>Parallax Depth Intensity (<strong id="parallax-val-label">28</strong>):</span>
+                            <input type="range" id="ui-parallax-range" min="0" max="60" value="28" />
+                        </label>
+
+                        <button type="button" id="btn-save-ui" class="glass-submit-btn">✦ Apply & Save Theme</button>
+                    </div>
+                </div>
+
+                <!-- TAB 3: OCTOPRINT LIVE PRINT MONITOR -->
+                <div id="tab-octoprint" class="settings-tab-pane hidden">
+                    <form id="octoprint-form" class="glass-form">
+                        <h4>OctoPrint Server Integration</h4>
+                        <p class="settings-help-text">
+                            When your 3D printer is actively printing, a live notification card automatically appears showing completion % and exact time remaining. When the print finishes, it shows a completion alert for 5 seconds and disappears.
+                        </p>
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="octo-enabled-toggle" checked />
+                            <span><strong>Enable OctoPrint Live Notification Watcher</strong></span>
+                        </label>
+                        <input type="url" id="octo-url-input" placeholder="OctoPrint URL (e.g. http://192.168.2.100)" required />
+                        <input type="password" id="octo-key-input" placeholder="OctoPrint API Key (leave blank to keep existing)" />
+                        <button type="submit" class="glass-submit-btn">✦ Save OctoPrint Settings</button>
+                    </form>
+                </div>
+
+                <!-- TAB 4: SERVERS & SSH CONFIGURATION -->
                 <div id="tab-servers" class="settings-tab-pane hidden">
                     <form id="server-form" class="glass-form">
                         <h4>Add New Server or Update Existing Node</h4>
@@ -259,20 +367,20 @@
                     </form>
 
                     <div class="settings-divider"></div>
-                    <h4>Configured Servers (Click Edit to Rename or Reconfigure)</h4>
+                    <h4>Configured Servers</h4>
                     <div id="settings-server-list" class="settings-item-list"></div>
                 </div>
 
-                <!-- TAB 3: SERVER-WIDE DRIVE ALIASES -->
+                <!-- TAB 5: SERVER-WIDE DRIVE ALIASES -->
                 <div id="tab-drives" class="settings-tab-pane hidden">
                     <h4>Server-Wide Local Drive Names</h4>
                     <p class="settings-help-text">
-                        Rename any drive below. Names are stored on DWSConnect so everyone opening the site sees the custom name without modifying the disk volume label on your servers.
+                        Rename any drive below. Names are stored on DWSConnect so everyone opening the site sees the custom name without modifying the disk volume label on your computers.
                     </p>
                     <div id="settings-drives-list" class="settings-item-list"></div>
                 </div>
 
-                <!-- TAB 4: STATIC & TIME-OF-DAY WALLPAPERS -->
+                <!-- TAB 6: STATIC & TIME-OF-DAY WALLPAPERS -->
                 <div id="tab-wallpapers" class="settings-tab-pane hidden">
                     <form id="bg-form" class="glass-form">
                         <h4>Default / Static Wallpaper</h4>
@@ -285,7 +393,7 @@
                         <div class="settings-divider"></div>
                         <label class="checkbox-label">
                             <input type="checkbox" id="time-bg-toggle" name="time_based_enabled" />
-                            <span><strong>Enable Time-of-Day Dynamic Wallpapers</strong> (Changes automatically by hour)</span>
+                            <span><strong>Enable Time-of-Day Dynamic Wallpapers</strong></span>
                         </label>
 
                         <div class="time-wallpaper-grid">
@@ -318,52 +426,11 @@
                     </form>
                 </div>
 
-                <!-- TAB 5: APPEARANCE, DYNAMIC DARK MODE & LIQUID FX -->
-                <div id="tab-appearance" class="settings-tab-pane hidden">
-                    <div class="glass-form">
-                        <h4>Theme & OS Dark Mode Sync</h4>
-                        <label class="select-label">
-                            <span>Color Theme Mode:</span>
-                            <select id="ui-theme-select" class="glass-select">
-                                <option value="auto">Dynamic Auto (Follows Computer Dark / Light Mode)</option>
-                                <option value="dark">Force Liquid Dark Mode</option>
-                                <option value="light">Force Frosted Light Mode</option>
-                            </select>
-                        </label>
-
-                        <label class="select-label">
-                            <span>Color Accent Spectrum:</span>
-                            <select id="ui-accent-select" class="glass-select">
-                                <option value="aurora">Aurora Cyan & Violet</option>
-                                <option value="emerald">Emerald Matrix & Mint</option>
-                                <option value="plasma">Sunset Plasma Pink & Amber</option>
-                                <option value="crimson">Crimson Redline & Orange</option>
-                                <option value="solar">Solar Gold & Electric Blue</option>
-                            </select>
-                        </label>
-
-                        <label class="range-label">
-                            <span>Liquid Glass Blur (<strong id="blur-val-label">24px</strong>):</span>
-                            <input type="range" id="ui-blur-range" min="8" max="44" value="24" />
-                        </label>
-
-                        <label class="range-label">
-                            <span>Parallax Depth Intensity (<strong id="parallax-val-label">28</strong>):</span>
-                            <input type="range" id="ui-parallax-range" min="0" max="60" value="28" />
-                        </label>
-
-                        <button type="button" id="btn-save-ui" class="glass-submit-btn">✦ Apply Theme & FX Settings</button>
-                    </div>
-                </div>
-
-                <!-- TAB 6: LIVE VIDEO FEED NOTIFICATION SPAWNER -->
+                <!-- TAB 7: LIVE VIDEO FEED NOTIFICATION SPAWNER -->
                 <div id="tab-video" class="settings-tab-pane hidden">
                     <form id="video-notif-form" class="glass-form">
                         <h4>Push Live Video Stream Notification</h4>
-                        <p class="settings-help-text">
-                            Attach a live camera feed (MJPEG, HLS .m3u8, MP4/WebM stream, or embedded WebRTC/Frigate/Scrypted iframe URL) directly into the Right Notification Area.
-                        </p>
-                        <input type="text" id="vid-notif-title" placeholder="Feed Title (e.g. Driveway Cam / Ender 5 S1 Nozzle)" required />
+                        <input type="text" id="vid-notif-title" placeholder="Feed Title (e.g. Driveway Cam / Ender 5 S1)" required />
                         <input type="url" id="vid-notif-url" placeholder="Stream URL (https://...)" required />
                         <label class="select-label">
                             <span>Stream Format:</span>

@@ -17,7 +17,6 @@
     --silk-in-out: cubic-bezier(0.33, 1, 0.68, 1);
 }
 
-/* Dynamic Light Mode Variables */
 html[data-theme="light"] {
     --bg-base: #eef2ff;
     --text-main: #0f172a;
@@ -28,7 +27,6 @@ html[data-theme="light"] {
     --glass-border-lo: rgba(15, 23, 42, 0.12);
 }
 
-/* Accent Color Presets */
 html[data-accent="emerald"] {
     --accent-1: #10b981;
     --accent-2: #06b6d4;
@@ -77,7 +75,7 @@ html, body {
 }
 
 /* =========================================================
-   1. SEAMLESS INTRO CURTAIN & FLOATING SVG HEADER
+   1. FAST INTRO CURTAIN & FLOATING SVG HEADER
    ========================================================= */
 #boot-curtain {
     position: fixed;
@@ -86,11 +84,7 @@ html, body {
     z-index: 900;
     pointer-events: none;
     opacity: 1;
-    transition: opacity 0.9s var(--silk-in-out);
-}
-
-#boot-curtain.fast-boot {
-    transition: opacity 0.22s ease-out;
+    transition: opacity 0.42s var(--silk-in-out);
 }
 
 #boot-curtain.fade-away {
@@ -101,27 +95,23 @@ html, body {
     position: fixed;
     top: 0;
     left: 50%;
-    width: min(390px, 82vw);
-    height: 180px;
+    width: min(380px, 80vw);
+    height: 175px;
     z-index: 950;
     display: flex;
     align-items: center;
     justify-content: center;
     pointer-events: none;
     transform-origin: top center;
-    transition: transform 1.15s var(--spring-bubbly);
-}
-
-#brand-header.fast-boot {
-    transition: transform 0.26s var(--smooth-out);
+    transition: transform 0.65s var(--spring-bubbly);
 }
 
 #brand-header.state-booting {
-    transform: translate3d(-50%, calc(50dvh - 90px), 0) scale(1);
+    transform: translate3d(-50%, calc(50dvh - 88px), 0) scale(1);
 }
 
 #brand-header.state-docked {
-    transform: translate3d(-50%, max(6px, env(safe-area-inset-top, 6px)), 0) scale(0.44);
+    transform: translate3d(-50%, max(4px, env(safe-area-inset-top, 4px)), 0) scale(0.42);
 }
 
 #boot-svg-container {
@@ -140,7 +130,7 @@ html, body {
 }
 
 /* =========================================================
-   2. GPU-ACCELERATED PARALLAX BACKGROUND (NO GREY STALL)
+   2. GPU PARALLAX BACKGROUND ENGINE
    ========================================================= */
 #parallax-viewport {
     position: fixed;
@@ -218,8 +208,12 @@ html, body {
 }
 
 /* =========================================================
-   3. THREE-COLUMN WORKSPACE & EXPANDING STAGE CHOREOGRAPHY
+   3. WORKSPACE & MAIN WIDGET HOVER GROWTH
    ========================================================= */
+.mobile-pane-switcher {
+    display: none;
+}
+
 #workspace {
     position: relative;
     z-index: 10;
@@ -227,13 +221,12 @@ html, body {
     height: 100dvh;
     display: grid;
     grid-template-columns: minmax(310px, 380px) minmax(420px, 1fr) minmax(320px, 380px);
-    gap: 20px;
+    gap: 22px;
     align-items: stretch;
-    padding: 88px 22px 22px;
+    padding: 84px 24px 24px;
     transition: grid-template-columns 0.6s var(--spring-bubbly), gap 0.5s var(--smooth-out);
 }
 
-/* When Center Stage Iframe opens, push Left & Right tabs aside and expand Middle! */
 #workspace.stage-expanded {
     grid-template-columns: 230px 1fr 240px;
     gap: 14px;
@@ -241,7 +234,7 @@ html, body {
 
 #workspace.stage-expanded #left-file-panel,
 #workspace.stage-expanded #right-column-wrapper {
-    opacity: 0.82;
+    opacity: 0.84;
     transform: scale(0.97);
     transition: opacity 0.45s ease, transform 0.55s var(--spring-bubbly);
 }
@@ -252,7 +245,7 @@ html, body {
     transform: scale(1);
 }
 
-/* Side Panels */
+/* Side Panels & Hover Growth */
 .liquid-side-panel {
     display: flex;
     flex-direction: column;
@@ -269,11 +262,13 @@ html, body {
     box-shadow: 0 24px 54px rgba(0, 0, 0, 0.36), inset 0 1px 2px rgba(255, 255, 255, 0.3);
     overflow: hidden;
     opacity: 0;
-    transform: translateY(18px) scale(0.96);
+    transform: translateY(16px) scale(0.96);
     transition:
-        opacity 0.5s var(--smooth-out),
-        transform 0.55s var(--spring-bubbly),
+        opacity 0.45s var(--smooth-out),
+        transform 0.48s var(--spring-bubbly),
+        flex 0.55s var(--spring-bubbly),
         height 0.55s var(--spring-bubbly),
+        border-color 0.3s ease,
         box-shadow 0.35s ease;
 }
 
@@ -282,13 +277,22 @@ html, body {
     transform: translateY(0) scale(1);
 }
 
-.liquid-side-panel:hover {
-    box-shadow: 0 28px 64px rgba(0, 0, 0, 0.44), 0 0 28px -8px var(--accent-glow), inset 0 1px 2px rgba(255, 255, 255, 0.38);
+/* Main Widget Hover Grow Into View Effect (All 3/4 Widgets) */
+.liquid-side-panel.panel-revealed:hover,
+#app-grid.box-open-x:hover,
+.liquid-center-stage:hover,
+.dropdown-widget-drawer:hover {
+    transform: translateY(-5px) scale(1.016) !important;
+    border-color: rgba(125, 211, 252, 0.58);
+    box-shadow:
+        0 32px 68px rgba(0, 0, 0, 0.48),
+        0 0 34px -6px var(--accent-glow),
+        inset 0 1px 2px rgba(255, 255, 255, 0.42);
+    z-index: 25;
 }
 
-/* Seamless Headers (Zero Grey Boxes!) */
 .panel-header {
-    padding: 16px 18px 10px;
+    padding: 15px 18px 10px;
     display: flex;
     align-items: center;
     justify-content: space-between;
@@ -351,7 +355,7 @@ html, body {
 }
 
 /* =========================================================
-   4. COLORFUL LIQUID BUTTONS (HOVER & CLICK SPRING LIFE)
+   4. COLORFUL LIQUID BUTTONS
    ========================================================= */
 .glass-icon-btn,
 .glass-action-btn,
@@ -381,8 +385,9 @@ html, body {
 .notif-tab:hover,
 .breadcrumb-crumb:hover {
     transform: translateY(-2.5px) scale(1.06);
-    background: linear-gradient(135deg, rgba(56, 189, 248, 0.34), rgba(168, 85, 247, 0.3), rgba(236, 72, 153, 0.25));
-    border-color: rgba(255, 255, 255, 0.55);
+    background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+    border-color: rgba(255, 255, 255, 0.6);
+    color: #fff;
     box-shadow: 0 8px 20px -4px var(--accent-glow);
 }
 
@@ -400,9 +405,8 @@ html, body {
 }
 
 .glass-action-btn.danger:hover {
-    background: linear-gradient(135deg, rgba(239, 68, 68, 0.55), rgba(249, 115, 22, 0.4));
+    background: linear-gradient(135deg, #ef4444, #f97316);
     border-color: rgba(252, 165, 165, 0.7);
-    box-shadow: 0 8px 20px -4px rgba(239, 68, 68, 0.5);
 }
 
 .panel-scroll-body {
@@ -438,24 +442,26 @@ html, body {
 }
 
 /* =========================================================
-   5. LEFT PANEL: TRANSPARENT SHELL BAR, DRIVES & SFTP
+   5. SINGLE-ROW SSH SHELL BAR & DRIVES
    ========================================================= */
 .server-shell-bar {
-    display: flex;
-    align-items: center;
-    flex-wrap: wrap;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
     gap: 6px;
-    padding: 6px 16px 10px;
+    padding: 6px 14px 10px;
     background: transparent;
     border-bottom: 1px solid rgba(255, 255, 255, 0.07);
     flex-shrink: 0;
 }
 
-.shell-bar-label {
+.server-shell-bar .glass-pill-btn {
+    width: 100%;
+    padding: 6px 6px;
     font-size: 11px;
-    font-weight: 600;
-    color: var(--text-muted);
-    margin-right: 4px;
+    text-align: center;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
 }
 
 .drive-card {
@@ -476,13 +482,9 @@ html, body {
 
 .drive-card:hover {
     background: linear-gradient(135deg, rgba(56, 189, 248, 0.18) 0%, rgba(168, 85, 247, 0.12) 100%);
-    border-color: rgba(125, 211, 252, 0.58);
+    border-color: var(--accent-1);
     transform: translateY(-3px) scale(1.018);
     box-shadow: 0 14px 28px -8px rgba(0, 0, 0, 0.4), 0 0 20px -6px var(--accent-glow);
-}
-
-.drive-card:active {
-    transform: scale(0.97);
 }
 
 .drive-card-top {
@@ -596,7 +598,6 @@ html, body {
     color: var(--text-muted);
 }
 
-/* File Browser Toolbar (No Grey Box!) */
 .browser-toolbar {
     padding: 8px 14px 10px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
@@ -631,12 +632,6 @@ html, body {
     color: var(--text-main);
     font-size: 11.5px;
     outline: none;
-    transition: border-color 0.25s ease, box-shadow 0.25s ease;
-}
-
-.glass-mini-input:focus {
-    border-color: var(--accent-1);
-    box-shadow: 0 0 14px -2px var(--accent-glow);
 }
 
 #file-list-container.drag-over {
@@ -699,16 +694,8 @@ html, body {
     gap: 8px;
 }
 
-.selected-file-name {
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
 /* =========================================================
-   6. CENTER COLUMN: FULL-WIDTH SEARCH BAR + INTEGRATED SETTINGS
+   6. CENTER COLUMN & SHALLOW FILE QUICK-SEARCH TRAY
    ========================================================= */
 #center-column {
     display: flex;
@@ -721,7 +708,13 @@ html, body {
     width: 100%;
 }
 
-/* Search Bar Spans Exact Full Width of Center Widget! */
+.center-search-wrapper {
+    position: relative;
+    width: 100%;
+    z-index: 40;
+    flex-shrink: 0;
+}
+
 .center-search-bar {
     position: relative;
     width: 100%;
@@ -738,7 +731,6 @@ html, body {
     box-shadow: 0 16px 36px rgba(0, 0, 0, 0.28);
     padding: 5px 6px 5px 18px;
     gap: 10px;
-    flex-shrink: 0;
     transition: transform 0.32s var(--spring-bubbly), border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
@@ -780,7 +772,6 @@ html, body {
     white-space: nowrap;
 }
 
-/* Seamlessly Integrated Corner Settings Button Inside Search Bar */
 .search-corner-settings-btn {
     width: 36px;
     height: 36px;
@@ -803,8 +794,41 @@ html, body {
     box-shadow: 0 0 22px var(--accent-1);
 }
 
-.search-corner-settings-btn:active {
-    transform: rotate(90deg) scale(0.9);
+/* Shallow Quick File Search Dropdown */
+.quick-file-results {
+    position: absolute;
+    top: calc(100% + 8px);
+    left: 0;
+    right: 0;
+    max-height: 250px;
+    overflow-y: auto;
+    border-radius: 22px;
+    background: var(--glass-surface);
+    backdrop-filter: blur(30px) saturate(200%);
+    -webkit-backdrop-filter: blur(30px) saturate(200%);
+    border: 1px solid var(--glass-border-hi);
+    box-shadow: 0 24px 48px rgba(0, 0, 0, 0.55);
+    padding: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    animation: notifPopIn 0.25s var(--spring-bubbly);
+}
+
+.quick-file-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 12px;
+    border-radius: 12px;
+    cursor: pointer;
+    transition: transform 0.2s var(--spring-bubbly), background 0.2s ease;
+    font-size: 12px;
+}
+
+.quick-file-item:hover {
+    background: linear-gradient(135deg, rgba(56, 189, 248, 0.24), rgba(168, 85, 247, 0.2));
+    transform: translateX(4px);
 }
 
 /* App Grid */
@@ -831,7 +855,11 @@ html, body {
     justify-items: center;
     transform: scaleX(0.01);
     opacity: 0;
-    transition: transform 0.55s var(--spring-bubbly), opacity 0.42s ease;
+    transition:
+        transform 0.52s var(--spring-bubbly),
+        opacity 0.38s ease,
+        border-color 0.3s ease,
+        box-shadow 0.35s ease;
 }
 
 #app-grid.box-open-x {
@@ -849,7 +877,7 @@ html, body {
     cursor: pointer;
     opacity: 0;
     transform: translateY(18px) scale(0.88);
-    transition: opacity 0.42s var(--smooth-out), transform 0.42s var(--spring-bubbly);
+    transition: opacity 0.38s var(--smooth-out), transform 0.38s var(--spring-bubbly);
     transition-delay: var(--stagger-delay, 0ms);
 }
 
@@ -880,10 +908,6 @@ html, body {
     transform: translateY(-6px) scale(1.1) rotate(-2deg);
     border-color: var(--accent-1);
     box-shadow: 0 16px 32px rgba(0, 0, 0, 0.42), 0 0 24px -2px var(--accent-glow);
-}
-
-.app-widget:active .app-squircle {
-    transform: scale(0.9);
 }
 
 .app-mode-dot {
@@ -940,6 +964,7 @@ html, body {
     flex-direction: column;
     overflow: hidden;
     animation: stageUnfurl 0.52s var(--spring-bubbly);
+    transition: transform 0.45s var(--spring-bubbly), box-shadow 0.35s ease;
 }
 
 @keyframes stageUnfurl {
@@ -987,33 +1012,48 @@ html, body {
 }
 
 /* =========================================================
-   8. RIGHT COLUMN: NOTIFICATIONS + BOTTOM DROPDOWN WIDGET
+   8. RIGHT COLUMN: ANIMATED UPWARD LIFT + DROPDOWN WIDGET
    ========================================================= */
 .right-column-wrapper {
     display: flex;
     flex-direction: column;
-    gap: 14px;
+    gap: 16px;
     min-height: 0;
     height: 100%;
-    transition: all 0.5s var(--spring-bubbly);
+}
+
+#right-notif-panel {
+    flex: 1 1 100%;
+    transition:
+        flex 0.62s var(--spring-bubbly),
+        height 0.62s var(--spring-bubbly),
+        transform 0.52s var(--spring-bubbly),
+        box-shadow 0.35s ease;
 }
 
 .right-column-wrapper.has-dropdown-widget #right-notif-panel {
-    height: 50%;
     flex: 1 1 50%;
+    height: 50%;
+    animation: notifLiftBounce 0.58s var(--spring-bubbly);
+}
+
+@keyframes notifLiftBounce {
+    0% { transform: translateY(24px) scale(0.97); }
+    60% { transform: translateY(-6px) scale(1.01); }
+    100% { transform: translateY(0) scale(1); }
 }
 
 .dropdown-widget-drawer {
-    height: 50%;
     flex: 1 1 50%;
+    height: 50%;
     opacity: 1 !important;
-    transform: none !important;
-    animation: drawerSlideUp 0.48s var(--spring-bubbly);
+    animation: drawerSlideUpSpring 0.62s var(--spring-bubbly);
 }
 
-@keyframes drawerSlideUp {
-    from { opacity: 0; transform: translateY(40px) scale(0.94); }
-    to { opacity: 1; transform: translateY(0) scale(1); }
+@keyframes drawerSlideUpSpring {
+    0% { opacity: 0; transform: translateY(70px) scale(0.88); }
+    65% { opacity: 1; transform: translateY(-6px) scale(1.015); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 #dropdown-widget-iframe {
@@ -1023,7 +1063,7 @@ html, body {
     background: #050811;
 }
 
-/* Seamless Notification Filter Tabs (No Grey Box!) */
+/* Sortable & Collapsible Notifications */
 .notif-filter-bar {
     display: flex;
     gap: 6px;
@@ -1046,6 +1086,14 @@ html, body {
     box-shadow: 0 4px 14px -2px var(--accent-glow);
 }
 
+.notif-sort-hint {
+    font-size: 10.5px;
+    color: var(--text-muted);
+    text-align: center;
+    opacity: 0.72;
+    padding-bottom: 2px;
+}
+
 .notif-section-stack {
     display: flex;
     flex-direction: column;
@@ -1064,14 +1112,48 @@ html, body {
     display: flex;
     flex-direction: column;
     gap: 8px;
-    transition: transform 0.3s var(--spring-bubbly), border-color 0.25s ease, box-shadow 0.25s ease;
+    transition:
+        transform 0.3s var(--spring-bubbly),
+        padding 0.28s var(--smooth-out),
+        border-color 0.25s ease,
+        box-shadow 0.25s ease;
     animation: notifPopIn 0.36s var(--spring-bubbly);
 }
 
 .notif-card:hover {
     transform: translateY(-2px) scale(1.012);
-    border-color: rgba(125, 211, 252, 0.5);
+    border-color: var(--accent-1);
     box-shadow: 0 14px 28px rgba(0, 0, 0, 0.32), 0 0 18px -6px var(--accent-glow);
+}
+
+.notif-card.dragging {
+    opacity: 0.45;
+    transform: scale(0.96);
+}
+
+.notif-card.drag-over-card {
+    border-top: 2px solid var(--accent-1);
+    transform: translateY(4px);
+}
+
+/* Collapsed Notification State (Click Header to Shrink) */
+.notif-card.collapsed {
+    padding: 9px 14px;
+    gap: 0;
+}
+
+.notif-card.collapsed .notif-body {
+    display: none !important;
+}
+
+.notif-collapse-chevron {
+    font-size: 10px;
+    opacity: 0.65;
+    transition: transform 0.28s var(--spring-bubbly);
+}
+
+.notif-card.collapsed .notif-collapse-chevron {
+    transform: rotate(-90deg);
 }
 
 @keyframes notifPopIn {
@@ -1090,8 +1172,8 @@ html, body {
 }
 
 .notif-card.type-success {
-    background: linear-gradient(135deg, rgba(16, 185, 129, 0.24), rgba(6, 95, 70, 0.1));
-    border-color: rgba(52, 211, 153, 0.45);
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.28), rgba(6, 95, 70, 0.14));
+    border-color: rgba(52, 211, 153, 0.55);
 }
 
 .notif-card.type-live,
@@ -1105,6 +1187,7 @@ html, body {
     align-items: center;
     justify-content: space-between;
     gap: 8px;
+    cursor: pointer;
 }
 
 .notif-card-title {
@@ -1139,7 +1222,6 @@ html, body {
     word-break: break-word;
 }
 
-/* Clean Unsophisticated Clock */
 .live-clock-big {
     font-size: 26px;
     font-weight: 800;
@@ -1156,7 +1238,6 @@ html, body {
     color: var(--text-muted);
 }
 
-/* Server Status Notification Rows */
 .cluster-status-list {
     display: flex;
     flex-direction: column;
@@ -1199,7 +1280,6 @@ html, body {
     color: var(--text-muted);
 }
 
-/* Connection Speed Graph */
 .speed-metrics-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
@@ -1235,7 +1315,6 @@ html, body {
     display: block;
 }
 
-/* Live Video Feed Notification Container */
 .notif-video-wrap {
     position: relative;
     width: 100%;
@@ -1257,7 +1336,7 @@ html, body {
 }
 
 /* =========================================================
-   9. SETTINGS CONTROL CENTER MODAL
+   9. SETTINGS MODAL & CUSTOM THEME STUDIO
    ========================================================= */
 .liquid-close-btn {
     width: 28px;
@@ -1293,7 +1372,7 @@ html, body {
 }
 
 .liquid-modal-card {
-    width: min(680px, 95vw);
+    width: min(700px, 95vw);
     max-height: 88dvh;
     border-radius: 28px;
     background: var(--glass-surface);
@@ -1334,11 +1413,6 @@ html, body {
     transition: all 0.25s var(--spring-bubbly);
 }
 
-.settings-tab-btn:hover {
-    color: var(--text-main);
-    transform: translateY(-2px);
-}
-
 .settings-tab-btn.active {
     background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
     color: #fff;
@@ -1366,6 +1440,41 @@ html, body {
     gap: 10px;
 }
 
+.custom-theme-color-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+}
+
+.color-picker-card {
+    padding: 8px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(255, 255, 255, 0.05);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    text-align: center;
+    cursor: pointer;
+}
+
+.color-picker-card input[type="color"] {
+    width: 100%;
+    height: 32px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.saved-themes-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
 .glass-form input[type="text"],
 .glass-form input[type="url"],
 .glass-form input[type="password"],
@@ -1378,13 +1487,6 @@ html, body {
     color: var(--text-main);
     font-size: 12.5px;
     outline: none;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease;
-}
-
-.glass-form input:focus,
-.glass-select:focus {
-    border-color: var(--accent-1);
-    box-shadow: 0 0 14px -2px var(--accent-glow);
 }
 
 .select-label, .file-label, .checkbox-label, .range-label {
@@ -1427,11 +1529,6 @@ html, body {
 
 .glass-submit-btn:hover {
     transform: translateY(-2px) scale(1.02);
-    box-shadow: 0 12px 28px -2px var(--accent-glow);
-}
-
-.glass-submit-btn:active {
-    transform: scale(0.96);
 }
 
 .settings-divider {
@@ -1462,4 +1559,83 @@ html, body {
     border: 1px solid rgba(255, 255, 255, 0.15);
     background: rgba(255, 255, 255, 0.05);
     font-size: 12.5px;
+}
+
+/* =========================================================
+   10. PHONE / PORTRAIT MODE (SINGLE PANE + TOP SWITCHER)
+   ========================================================= */
+@media (max-width: 920px), (orientation: portrait) {
+    #brand-header.state-docked {
+        transform: translate3d(-50%, 2px, 0) scale(0.32);
+    }
+
+    .mobile-pane-switcher {
+        position: fixed;
+        top: 52px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 120;
+        width: calc(100vw - 24px);
+        max-width: 440px;
+        padding: 4px;
+        border-radius: 999px;
+        background: var(--glass-surface);
+        backdrop-filter: var(--glass-blur);
+        -webkit-backdrop-filter: var(--glass-blur);
+        border: 1px solid var(--glass-border-hi);
+        box-shadow: 0 12px 30px rgba(0, 0, 0, 0.4);
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 4px;
+    }
+
+    .mobile-switch-btn {
+        padding: 8px 6px;
+        border-radius: 999px;
+        border: none;
+        background: transparent;
+        color: var(--text-muted);
+        font-size: 12px;
+        font-weight: 700;
+        cursor: pointer;
+        transition: all 0.25s var(--spring-bubbly);
+    }
+
+    .mobile-switch-btn.active {
+        background: linear-gradient(135deg, var(--accent-1), var(--accent-2));
+        color: #fff;
+        box-shadow: 0 4px 14px var(--accent-glow);
+    }
+
+    #workspace,
+    #workspace.stage-expanded {
+        grid-template-columns: 1fr !important;
+        padding: 102px 12px 14px;
+        gap: 12px;
+    }
+
+    /* Show ONLY the active selected pane on phone/portrait */
+    #workspace[data-mobile-active="center"] #left-file-panel,
+    #workspace[data-mobile-active="center"] #right-column-wrapper {
+        display: none !important;
+    }
+
+    #workspace[data-mobile-active="drives"] #center-column,
+    #workspace[data-mobile-active="drives"] #right-column-wrapper {
+        display: none !important;
+    }
+
+    #workspace[data-mobile-active="notifs"] #left-file-panel,
+    #workspace[data-mobile-active="notifs"] #center-column {
+        display: none !important;
+    }
+
+    .form-grid-2,
+    .time-wallpaper-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .custom-theme-color-grid {
+        grid-template-columns: repeat(3, 1fr);
+    }
 }

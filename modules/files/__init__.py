@@ -12,7 +12,8 @@ from core.storage import StorageManager
 blueprint = Blueprint("files", __name__)
 
 _pool_lock = threading.Lock()
-_ssh_pool = {}  # server_id -> {"ssh": SSHClient, "os": "windows"|"linux", "host": str, "user": str}
+_ssh_pool = {}
+_shallow_index_cache = {"ts": 0, "entries": []}  # Cached for 45s to keep CPU usage near zero
 
 
 def _get_servers_dict():
@@ -72,6 +73,18 @@ def _exec_cmd(ssh, command, timeout=6):
 
 def os_path_basename(p):
     return posixpath.basename(p.rstrip("/"))
+
+
+def _normalize_sftp_path(path_str, os_type):
+    if not path_str:
+        return "/"
+    p = path_str.replace("\\", "/")
+    if os_type == "windows":
+        if len(p) >= 2 and p[1] == ":":
+            p = "/" + p
+        if len(p) == 3 and p.startswith("/") and p.endswith(":"):
+            p = p + "/"
+    return p
 
 
 def _fetch_server_drives(server_id, aliases):
@@ -222,18 +235,6 @@ def _fetch_server_drives(server_id, aliases):
         }
 
 
-def _normalize_sftp_path(path_str, os_type):
-    if not path_str:
-        return "/"
-    p = path_str.replace("\\", "/")
-    if os_type == "windows":
-        if len(p) >= 2 and p[1] == ":":
-            p = "/" + p
-        if len(p) == 3 and p.startswith("/") and p.endswith(":"):
-            p = p + "/"
-    return p
-
-
 @blueprint.route("/api/files/drives", methods=["GET"])
 def list_all_drives():
     settings = StorageManager.load_settings()
@@ -268,6 +269,112 @@ def list_all_drives():
         "drives": all_drives,
         "servers": server_status
     })
+
+
+def _scan_drive_shallow(drive):
+    """Scans depth 1 and 2 of a drive via SFTP (capped to keep CPU/IO light)."""
+    found = []
+    sid = drive["server_id"]
+    try:
+        ssh, os_type, _ = _get_ssh_connection(sid)
+        sftp = ssh.open_sftp()
+        root_path = _normalize_sftp_path(drive["sftp_root"], os_type)
+
+        try:
+            lvl1 = sftp.listdir_attr(root_path)
+        except IOError:
+            if root_path.startswith("/") and len(root_path) >= 3 and root_path[2] == ":":
+                root_path = root_path[1:]
+                lvl1 = sftp.listdir_attr(root_path)
+            else:
+                sftp.close()
+                return found
+
+        subdirs = []
+        for attr in lvl1[:45]:
+            name = attr.filename
+            if name in (".", "..") or name.startswith("$"):
+                continue
+            is_dir = stat.S_ISDIR(attr.st_mode) if attr.st_mode is not None else False
+            full_path = posixpath.join(root_path.rstrip("/"), name)
+            if root_path == "/":
+                full_path = "/" + name
+            found.append({
+                "name": name,
+                "path": full_path,
+                "parent_path": root_path,
+                "is_dir": is_dir,
+                "size": 0 if is_dir else int(attr.st_size or 0),
+                "server_id": sid,
+                "server_name": drive["server_name"],
+                "drive_id": drive["id"],
+                "drive_label": drive["label"]
+            })
+            if is_dir and len(subdirs) < 12:
+                subdirs.append(full_path)
+
+        for sub in subdirs:
+            try:
+                lvl2 = sftp.listdir_attr(sub)
+                for attr in lvl2[:25]:
+                    name = attr.filename
+                    if name in (".", ".."):
+                        continue
+                    is_dir = stat.S_ISDIR(attr.st_mode) if attr.st_mode is not None else False
+                    full_path = posixpath.join(sub.rstrip("/"), name)
+                    found.append({
+                        "name": name,
+                        "path": full_path,
+                        "parent_path": sub,
+                        "is_dir": is_dir,
+                        "size": 0 if is_dir else int(attr.st_size or 0),
+                        "server_id": sid,
+                        "server_name": drive["server_name"],
+                        "drive_id": drive["id"],
+                        "drive_label": drive["label"]
+                    })
+            except Exception:
+                continue
+
+        sftp.close()
+    except Exception:
+        pass
+    return found
+
+
+@blueprint.route("/api/files/search", methods=["GET"])
+def quick_search_files():
+    query = (request.args.get("q") or "").strip().lower()
+    if len(query) < 2:
+        return jsonify({"ok": True, "results": []})
+
+    now = time.time()
+    if now - _shallow_index_cache["ts"] > 45 or not _shallow_index_cache["entries"]:
+        settings = StorageManager.load_settings()
+        servers = settings.get("servers", {})
+        aliases = settings.get("drive_aliases", {})
+        sids = list(servers.keys())
+        drives = []
+        if sids:
+            with ThreadPoolExecutor(max_workers=len(sids)) as pool:
+                res_list = list(pool.map(lambda s: _fetch_server_drives(s, aliases), sids))
+            for r in res_list:
+                drives.extend(r["drives"])
+
+        entries = []
+        if drives:
+            with ThreadPoolExecutor(max_workers=min(6, len(drives))) as pool:
+                for chunk in pool.map(_scan_drive_shallow, drives):
+                    entries.extend(chunk)
+        _shallow_index_cache["ts"] = now
+        _shallow_index_cache["entries"] = entries
+
+    matches = [
+        item for item in _shallow_index_cache["entries"]
+        if query in item["name"].lower()
+    ][:18]
+
+    return jsonify({"ok": True, "results": matches})
 
 
 @blueprint.route("/api/files/list", methods=["GET"])

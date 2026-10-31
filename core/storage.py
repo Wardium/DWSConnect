@@ -10,22 +10,35 @@ _lock = threading.Lock()
 
 DEFAULT_SETTINGS = {
     "ui": {
-        "theme": "auto",           # "auto" (OS sync), "dark", or "light"
-        "accent": "aurora",        # "aurora", "emerald", "plasma", "crimson", "solar"
+        "theme": "auto",           # "auto" (OS sync), "dark", "light", or "custom"
+        "accent": "aurora",        # "aurora", "emerald", "plasma", "crimson", "solar", "custom"
         "glass_blur": 24,
         "parallax_intensity": 28,
-        "liquid_animations": True
+        "liquid_animations": True,
+        "custom_theme": {
+            "bg_base": "#070b19",
+            "text_main": "#ffffff",
+            "accent_1": "#38bdf8",
+            "accent_2": "#a855f7",
+            "accent_3": "#ec4899"
+        },
+        "saved_themes": []
+    },
+    "octoprint": {
+        "enabled": False,
+        "url": "http://192.168.2.100",
+        "api_key": ""
     },
     "background": {
-        "url": "",                 # Static custom background URL
-        "type": "svg",             # "svg" or "image"
+        "url": "",
+        "type": "svg",
         "parallax_intensity": 28,
         "time_based_enabled": False,
         "time_wallpapers": {
-            "morning": "",         # 06:00 - 11:59
-            "afternoon": "",       # 12:00 - 16:59
-            "evening": "",         # 17:00 - 20:59
-            "night": ""            # 21:00 - 05:59
+            "morning": "",
+            "afternoon": "",
+            "evening": "",
+            "night": ""
         }
     },
     "apps": [
@@ -35,12 +48,12 @@ DEFAULT_SETTINGS = {
             "url": "https://en.wikipedia.org",
             "icon": "",
             "iframe": True,
-            "launch_mode": "center",  # "center", "dropdown", or "tab"
+            "launch_mode": "center",
             "subject_type": "Knowledge Base"
         }
     ],
     "servers": copy.deepcopy(config.DEFAULT_SERVERS),
-    "drive_aliases": {}  # Maps "<server_id>:<mount>" -> "Custom Server-Wide Drive Name"
+    "drive_aliases": {}
 }
 
 
@@ -52,7 +65,6 @@ class StorageManager:
         if not os.path.exists(config.SETTINGS_FILE):
             StorageManager.save_settings(DEFAULT_SETTINGS)
         else:
-            # Ensure newly added keys exist in older settings.json files
             current = StorageManager.load_settings()
             StorageManager.save_settings(current)
 
@@ -62,9 +74,11 @@ class StorageManager:
         if not isinstance(data, dict):
             return merged
 
-        for key in ("ui", "background", "drive_aliases"):
+        for key in ("ui", "octoprint", "background", "drive_aliases"):
             if isinstance(data.get(key), dict):
                 merged[key].update(data[key])
+                if key == "ui" and isinstance(data["ui"].get("custom_theme"), dict):
+                    merged["ui"]["custom_theme"].update(data["ui"]["custom_theme"])
                 if key == "background" and isinstance(data["background"].get("time_wallpapers"), dict):
                     merged["background"]["time_wallpapers"].update(data["background"]["time_wallpapers"])
 
@@ -105,12 +119,13 @@ class StorageManager:
 
     @staticmethod
     def get_public_settings():
-        """Returns settings safe for frontend broadcast (masks raw SSH passwords)."""
         settings = StorageManager.load_settings()
         pub = copy.deepcopy(settings)
         for sid, srv in pub.get("servers", {}).items():
             srv["has_password"] = bool(srv.get("password"))
             srv.pop("password", None)
+        if "octoprint" in pub:
+            pub["octoprint"]["has_key"] = bool(pub["octoprint"].get("api_key"))
         return pub
 
     @staticmethod

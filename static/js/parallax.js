@@ -7,14 +7,13 @@
     let targetX = 0, targetY = 0;
     let currentX = 0, currentY = 0;
     let tick = 0;
+    let rafId = null;
 
-    // Desktop Mouse Parallax
     window.addEventListener("mousemove", (e) => {
         targetX = (e.clientX / window.innerWidth - 0.5) * 2;
         targetY = (e.clientY / window.innerHeight - 0.5) * 2;
-    });
+    }, { passive: true });
 
-    // Mobile Touch Parallax
     window.addEventListener("touchmove", (e) => {
         if (e.touches.length > 0) {
             targetX = (e.touches[0].clientX / window.innerWidth - 0.5) * 1.5;
@@ -22,15 +21,11 @@
         }
     }, { passive: true });
 
-    // Mobile Gyroscope Tilt Parallax
-    window.addEventListener("deviceorientation", (e) => {
-        if (e.gamma !== null && e.beta !== null) {
-            targetX = Math.max(-1, Math.min(1, e.gamma / 30));
-            targetY = Math.max(-1, Math.min(1, (e.beta - 45) / 30));
-        }
-    });
-
     function animateParallax() {
+        if (document.hidden) {
+            rafId = null;
+            return;
+        }
         tick += 0.012;
         currentX += (targetX - currentX) * 0.075;
         currentY += (targetY - currentY) * 0.075;
@@ -43,15 +38,21 @@
         });
 
         if (orb1 && orb2 && orb3) {
-            orb1.setAttribute("cx", 550 + Math.sin(tick) * 90);
-            orb1.setAttribute("cy", 380 + Math.cos(tick * 0.8) * 70);
-            orb2.setAttribute("cx", 1350 + Math.cos(tick * 0.9) * 110);
-            orb2.setAttribute("cy", 700 + Math.sin(tick * 0.7) * 85);
-            orb3.setAttribute("cx", 960 + Math.sin(tick * 1.1) * 75);
+            orb1.setAttribute("cx", (550 + Math.sin(tick) * 90).toFixed(1));
+            orb1.setAttribute("cy", (380 + Math.cos(tick * 0.8) * 70).toFixed(1));
+            orb2.setAttribute("cx", (1350 + Math.cos(tick * 0.9) * 110).toFixed(1));
+            orb2.setAttribute("cy", (700 + Math.sin(tick * 0.7) * 85).toFixed(1));
+            orb3.setAttribute("cx", (960 + Math.sin(tick * 1.1) * 75).toFixed(1));
         }
 
-        requestAnimationFrame(animateParallax);
+        rafId = requestAnimationFrame(animateParallax);
     }
 
-    requestAnimationFrame(animateParallax);
+    document.addEventListener("visibilitychange", () => {
+        if (!document.hidden && !rafId) {
+            rafId = requestAnimationFrame(animateParallax);
+        }
+    });
+
+    rafId = requestAnimationFrame(animateParallax);
 })();

@@ -17,7 +17,7 @@
             background-color: #eef2ff;
         }
     </style>
-    <link rel="stylesheet" href="/static/css/liquid_glass.css" />
+    <link rel="stylesheet" href="/static/css/liquid_glass.css?v={{ asset_v }}" />
 </head>
 <body>
     <!-- 1. SEAMLESS INTRO CURTAIN & FLOATING SVG HEADER -->
@@ -39,7 +39,7 @@
         <div class="parallax-layer ambient-grid" data-depth="0.05"></div>
     </div>
 
-    <!-- PHONE / PORTRAIT TOP PANE SWITCHER (DEFAULTS TO MIDDLE PANE) -->
+    <!-- PHONE / PORTRAIT TOP PANE SWITCHER -->
     <nav id="mobile-pane-switcher" class="mobile-pane-switcher" aria-label="Workspace Section Switcher">
         <button class="mobile-switch-btn" data-mobile-pane="drives">💽 Drives</button>
         <button class="mobile-switch-btn active" data-mobile-pane="center">✦ Workspace</button>
@@ -66,15 +66,12 @@
                 </div>
             </div>
 
-            <!-- Single-Row Dynamic Server SSH Quick Bar -->
             <div class="server-shell-bar" id="server-shell-bar"></div>
 
-            <!-- View A: All Connected Drives List -->
             <div id="drives-list-view" class="panel-scroll-body">
                 <div class="panel-empty-state">Scanning SSH servers for connected disks...</div>
             </div>
 
-            <!-- View B: Active Disk File Browser -->
             <div id="file-browser-view" class="panel-flex-body hidden">
                 <div class="browser-toolbar">
                     <div class="breadcrumb-bar" id="file-breadcrumbs"></div>
@@ -100,7 +97,7 @@
             </div>
         </aside>
 
-        <!-- CENTER SECTION: FULL-WIDTH SEARCH BAR + SHALLOW FILE RESULTS + APP GRID + EXPANDING STAGE -->
+        <!-- CENTER SECTION -->
         <section id="center-column">
             <div class="center-search-wrapper">
                 <div class="center-search-bar">
@@ -118,14 +115,11 @@
                     </button>
                 </div>
 
-                <!-- Quick Shallow File Search Results Popover -->
                 <div id="quick-file-search-results" class="quick-file-results hidden"></div>
             </div>
 
-            <!-- App Grid -->
             <div id="app-grid"></div>
 
-            <!-- Fancy Expanding Center Stage Iframe (Pushes Left & Right Panels Aside) -->
             <div id="center-iframe-stage" class="liquid-center-stage hidden">
                 <div class="stage-header">
                     <div class="stage-title-group">
@@ -145,7 +139,7 @@
             </div>
         </section>
 
-        <!-- RIGHT SECTION: SPLIT COLUMN (TOP: NOTIFICATIONS, BOTTOM: PERSISTENT DROPDOWN WIDGET DRAWER) -->
+        <!-- RIGHT SECTION -->
         <div id="right-column-wrapper" class="right-column-wrapper">
             <aside id="right-notif-panel" class="liquid-side-panel">
                 <div class="panel-header">
@@ -173,7 +167,6 @@
                 </div>
             </aside>
 
-            <!-- Bottom Half Persistent Per-User Dropdown Widget Drawer -->
             <aside id="dropdown-widget-drawer" class="liquid-side-panel dropdown-widget-drawer hidden">
                 <div class="panel-header">
                     <div class="panel-title-group">
@@ -204,6 +197,22 @@
                     <button id="btn-replay-boot" class="glass-action-btn" title="Replay Intro Animation">✦ Replay Intro</button>
                     <button id="settings-close" class="liquid-close-btn">✕</button>
                 </div>
+            </div>
+
+            <!-- LIVE GITHUB AUTO-UPDATER STATUS BANNER -->
+            <div id="updater-status-bar" style="padding:10px 22px; border-bottom:1px solid rgba(255,255,255,0.1); display:flex; align-items:center; justify-content:space-between; gap:10px; font-size:11.5px; background:linear-gradient(90deg, rgba(56,189,248,0.12), rgba(168,85,247,0.08));">
+                <div style="display:flex; flex-direction:column; gap:2px; min-width:0;">
+                    <div>
+                        <strong>GitHub Auto-Updater:</strong>
+                        <span id="upd-last-pulled" style="color:var(--accent-1); font-weight:600;">Loading...</span>
+                    </div>
+                    <div style="color:var(--text-muted); font-size:10.5px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+                        Commit: <code id="upd-commit-hash">--</code> · <span id="upd-commit-msg">--</span> · Last Checked: <span id="upd-last-checked">--</span>
+                    </div>
+                </div>
+                <button type="button" id="btn-check-github-now" class="glass-action-btn primary" style="flex-shrink:0;">
+                    ↻ Check GitHub Now
+                </button>
             </div>
 
             <!-- Settings Navigation Tabs -->
@@ -329,18 +338,19 @@
 
                 <!-- TAB 3: OCTOPRINT LIVE PRINT MONITOR -->
                 <div id="tab-octoprint" class="settings-tab-pane hidden">
-                    <form id="octoprint-form" class="glass-form">
+                    <form id="octoprint-form" class="glass-form" novalidate>
                         <h4>OctoPrint Server Integration</h4>
                         <p class="settings-help-text">
-                            When your 3D printer is actively printing, a live notification card automatically appears showing completion % and exact time remaining. When the print finishes, it shows a completion alert for 5 seconds and disappears.
+                            Enter your OctoPrint URL (e.g. <code>https://octoprint-rfdtq2xvdwq.teamexist.com</code>) and API Key. When warming up or printing, a live notification card automatically appears on the right.
                         </p>
                         <label class="checkbox-label">
                             <input type="checkbox" id="octo-enabled-toggle" checked />
                             <span><strong>Enable OctoPrint Live Notification Watcher</strong></span>
                         </label>
-                        <input type="url" id="octo-url-input" placeholder="OctoPrint URL (e.g. http://192.168.2.100)" required />
-                        <input type="password" id="octo-key-input" placeholder="OctoPrint API Key (leave blank to keep existing)" />
-                        <button type="submit" class="glass-submit-btn">✦ Save OctoPrint Settings</button>
+                        <input type="text" id="octo-url-input" placeholder="https://octoprint-rfdtq2xvdwq.teamexist.com" required />
+                        <input type="password" id="octo-key-input" placeholder="OctoPrint API Key (leave blank to keep stored key)" />
+                        <button type="button" id="btn-save-octoprint" class="glass-submit-btn">✦ Save & Test OctoPrint Connection</button>
+                        <div id="octo-inline-feedback" class="hidden" style="padding:10px 14px; border-radius:12px; font-size:12px; font-weight:600; margin-top:4px;"></div>
                     </form>
                 </div>
 
@@ -447,10 +457,10 @@
         </div>
     </div>
 
-    <script src="/static/js/notifications.js"></script>
-    <script src="/static/js/parallax.js"></script>
-    <script src="/static/js/dashboard.js"></script>
-    <script src="/static/js/file_viewer.js"></script>
-    <script src="/static/js/boot_anim.js"></script>
+    <script src="/static/js/notifications.js?v={{ asset_v }}"></script>
+    <script src="/static/js/parallax.js?v={{ asset_v }}"></script>
+    <script src="/static/js/dashboard.js?v={{ asset_v }}"></script>
+    <script src="/static/js/file_viewer.js?v={{ asset_v }}"></script>
+    <script src="/static/js/boot_anim.js?v={{ asset_v }}"></script>
 </body>
 </html>

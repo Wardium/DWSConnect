@@ -7,10 +7,8 @@
     const customBgImg = document.getElementById("custom-bg-img");
     const timeSlotPill = document.getElementById("time-slot-pill");
 
-    // Mobile Switcher
     const mobileSwitchBtns = document.querySelectorAll(".mobile-switch-btn");
 
-    // Expanding Center Stage Iframe Elements
     const centerStage = document.getElementById("center-iframe-stage");
     const centerIframe = document.getElementById("center-app-iframe");
     const stageTitle = document.getElementById("stage-app-title");
@@ -20,7 +18,6 @@
     const stageExtBtn = document.getElementById("stage-ext");
     const stageCloseBtn = document.getElementById("stage-close");
 
-    // Right Column Dropdown Widget Drawer Elements
     const rightColWrapper = document.getElementById("right-column-wrapper");
     const dropdownDrawer = document.getElementById("dropdown-widget-drawer");
     const dropdownTitle = document.getElementById("dropdown-widget-title");
@@ -29,7 +26,6 @@
     const dropdownReloadBtn = document.getElementById("dropdown-widget-reload");
     const dropdownCloseBtn = document.getElementById("dropdown-widget-close");
 
-    // Settings Modal Elements
     const settingsTrigger = document.getElementById("settings-trigger");
     const settingsModal = document.getElementById("settings-modal");
     const settingsClose = document.getElementById("settings-close");
@@ -44,7 +40,18 @@
     const bgForm = document.getElementById("bg-form");
     const resetBgBtn = document.getElementById("btn-reset-bg");
     const videoNotifForm = document.getElementById("video-notif-form");
+
+    // OctoPrint Controls
     const octoprintForm = document.getElementById("octoprint-form");
+    const saveOctoBtn = document.getElementById("btn-save-octoprint");
+    const octoFeedbackBox = document.getElementById("octo-inline-feedback");
+
+    // GitHub Updater Status Controls
+    const updLastPulled = document.getElementById("upd-last-pulled");
+    const updCommitHash = document.getElementById("upd-commit-hash");
+    const updCommitMsg = document.getElementById("upd-commit-msg");
+    const updLastChecked = document.getElementById("upd-last-checked");
+    const checkGithubBtn = document.getElementById("btn-check-github-now");
 
     // Custom Theme Studio Inputs
     const ctBgBase = document.getElementById("ct-bg-base");
@@ -68,7 +75,144 @@
     });
 
     // =========================================================================
-    // 1. PHONE / PORTRAIT TOP PANE SWITCHER
+    // 1. GITHUB AUTO-UPDATER STATUS BAR
+    // =========================================================================
+    function renderUpdaterStatus(upd = {}) {
+        if (!updLastPulled) return;
+        updLastPulled.textContent = upd.last_updated || "Unknown";
+        if (updCommitHash) updCommitHash.textContent = upd.current_commit || "--";
+        if (updCommitMsg) updCommitMsg.textContent = upd.commit_message || "No commit message";
+        if (updLastChecked) updLastChecked.textContent = upd.last_checked || "Never";
+    }
+
+    async function refreshUpdaterStatus() {
+        try {
+            const res = await fetch(`/api/updater/status?_=${Date.now()}`, { cache: "no-store" });
+            const data = await res.json();
+            if (data.ok && data.updater) {
+                renderUpdaterStatus(data.updater);
+            }
+        } catch (e) {}
+    }
+
+    if (checkGithubBtn) {
+        checkGithubBtn.addEventListener("click", async () => {
+            const origText = checkGithubBtn.textContent;
+            checkGithubBtn.textContent = "⏳ Checking...";
+            try {
+                const res = await fetch("/api/updater/check", { method: "POST" });
+                const data = await res.json();
+                if (data.updater) renderUpdaterStatus(data.updater);
+                if (data.updated) {
+                    checkGithubBtn.textContent = "✓ Pulling & Restarting...";
+                    setTimeout(() => window.location.reload(), 2000);
+                } else {
+                    checkGithubBtn.textContent = "✓ Up to Date";
+                    setTimeout(() => {
+                        checkGithubBtn.textContent = origText;
+                    }, 2000);
+                }
+            } catch (err) {
+                checkGithubBtn.textContent = "⚠ Check Failed";
+                setTimeout(() => {
+                    checkGithubBtn.textContent = origText;
+                }, 2000);
+            }
+        });
+    }
+
+    // =========================================================================
+    // 2. OCTOPRINT SAVE & INSTANT INLINE + NOTIFICATION FEEDBACK
+    // =========================================================================
+    function showOctoFeedback(message, isError = false) {
+        if (!octoFeedbackBox) return;
+        octoFeedbackBox.classList.remove("hidden");
+        octoFeedbackBox.style.background = isError
+            ? "rgba(239, 68, 68, 0.25)"
+            : "rgba(16, 185, 129, 0.25)";
+        octoFeedbackBox.style.border = isError
+            ? "1px solid rgba(248, 113, 113, 0.6)"
+            : "1px solid rgba(52, 211, 153, 0.6)";
+        octoFeedbackBox.textContent = message;
+    }
+
+    async function handleSaveOctoPrint(e) {
+        if (e) e.preventDefault();
+        const urlInput = document.getElementById("octo-url-input");
+        const keyInput = document.getElementById("octo-key-input");
+        const enabledToggle = document.getElementById("octo-enabled-toggle");
+
+        const rawUrl = (urlInput ? urlInput.value : "").trim();
+        const rawKey = (keyInput ? keyInput.value : "").trim();
+
+        if (!rawUrl) {
+            showOctoFeedback("⚠ Please enter your OctoPrint URL first.", true);
+            return;
+        }
+
+        if (saveOctoBtn) saveOctoBtn.textContent = "⏳ Testing OctoPrint Connection...";
+        showOctoFeedback(`⏳ Connecting to ${rawUrl}...`, false);
+
+        try {
+            const res = await fetch("/api/octoprint/config", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    enabled: enabledToggle ? enabledToggle.checked : true,
+                    url: rawUrl,
+                    api_key: rawKey
+                })
+            });
+            const data = await res.json();
+
+            if (res.ok && data.ok) {
+                serverState = data.settings;
+                if (keyInput) keyInput.value = "";
+                const stateMsg = `✅ Connected to OctoPrint! Current Printer State: ${data.printer_state || "Operational"}`;
+                showOctoFeedback(stateMsg, false);
+
+                if (window.DWSNotifications) {
+                    window.DWSNotifications.push({
+                        title: "OctoPrint Linked",
+                        icon: "🖨",
+                        type: "success",
+                        message: stateMsg,
+                        timerSeconds: 6,
+                        autoDismiss: true
+                    });
+                    if (typeof window.DWSNotifications.pollOctoPrint === "function") {
+                        window.DWSNotifications.pollOctoPrint();
+                    }
+                }
+            } else {
+                const errMsg = data.error || "Failed to verify OctoPrint connection.";
+                showOctoFeedback(`❌ ${errMsg}`, true);
+                if (window.DWSNotifications) {
+                    window.DWSNotifications.push({
+                        title: "OctoPrint Error",
+                        icon: "⚠",
+                        type: "error",
+                        message: errMsg,
+                        liveElapsed: true
+                    });
+                }
+            }
+        } catch (err) {
+            showOctoFeedback(`❌ Network error: ${err.message}`, true);
+        } finally {
+            if (saveOctoBtn) saveOctoBtn.textContent = "✦ Save & Test OctoPrint Connection";
+        }
+    }
+
+    if (saveOctoBtn) {
+        saveOctoBtn.addEventListener("click", handleSaveOctoPrint);
+    }
+    if (octoprintForm) {
+        octoprintForm.addEventListener("submit", handleSaveOctoPrint);
+    }
+
+    // =========================================================================
+    // 3. PHONE / PORTRAIT TOP PANE SWITCHER
     // =========================================================================
     function switchMobilePane(paneName) {
         workspace.setAttribute("data-mobile-active", paneName);
@@ -84,7 +228,7 @@
     });
 
     // =========================================================================
-    // 2. THEME ENGINE & CUSTOM THEME STUDIO
+    // 4. THEME ENGINE & CUSTOM THEME STUDIO
     // =========================================================================
     const osDarkMedia = window.matchMedia("(prefers-color-scheme: dark)");
 
@@ -143,7 +287,7 @@
             document.getElementById("parallax-val-label").textContent = `${ui.parallax_intensity}`;
         }
 
-        if (ui.custom_theme) {
+        if (ui.custom_theme && ctBgBase) {
             ctBgBase.value = ui.custom_theme.bg_base || "#070b19";
             ctTextMain.value = ui.custom_theme.text_main || "#ffffff";
             ctAccent1.value = ui.custom_theme.accent_1 || "#38bdf8";
@@ -226,7 +370,7 @@
     });
 
     // =========================================================================
-    // 3. TIME-OF-DAY DYNAMIC WALLPAPER ENGINE
+    // 5. TIME-OF-DAY DYNAMIC WALLPAPER ENGINE
     // =========================================================================
     function getCurrentTimeSlot() {
         const hr = new Date().getHours();
@@ -297,7 +441,7 @@
     }
 
     // =========================================================================
-    // 4. EXPANDING CENTER STAGE & DROPDOWN WIDGET DRAWER
+    // 6. EXPANDING CENTER STAGE & DROPDOWN WIDGET DRAWER
     // =========================================================================
     function openCenterStageApp(app) {
         activeStageApp = app;
@@ -399,7 +543,7 @@
     window.openDropdownWidget = openDropdownWidget;
 
     // =========================================================================
-    // 5. APP GRID & SHALLOW CROSS-SERVER FILE SEARCH
+    // 7. APP GRID & SHALLOW FILE SEARCH
     // =========================================================================
     window.recalculateTopToBottomStagger = function () {
         const widgets = Array.from(appGrid.querySelectorAll(".app-widget"));
@@ -528,10 +672,11 @@
     }
 
     // =========================================================================
-    // 6. SETTINGS TABS & CRUD HANDLERS
+    // 8. SETTINGS MODAL NAVIGATION
     // =========================================================================
     function openSettingsToTab(tabId = "tab-apps", serverIdToEdit = null) {
         settingsModal.classList.remove("hidden");
+        refreshUpdaterStatus();
         settingsTabBtns.forEach((btn) => btn.classList.toggle("active", btn.dataset.tab === tabId));
         settingsPanes.forEach((pane) => pane.classList.toggle("hidden", pane.id !== tabId));
 
@@ -692,46 +837,6 @@
         }
     });
 
-    if (octoprintForm) {
-        octoprintForm.addEventListener("submit", async (e) => {
-            e.preventDefault();
-            const payload = {
-                enabled: document.getElementById("octo-enabled-toggle").checked,
-                url: document.getElementById("octo-url-input").value.trim(),
-                api_key: document.getElementById("octo-key-input").value.trim()
-            };
-            const res = await fetch("/api/octoprint/config", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
-            });
-            const data = await res.json();
-            if (res.ok && data.ok) {
-                serverState = data.settings;
-                document.getElementById("octo-key-input").value = "";
-                if (window.DWSNotifications) {
-                    window.DWSNotifications.pollOctoPrint();
-                    window.DWSNotifications.push({
-                        title: "OctoPrint Verified & Linked",
-                        icon: "🖨",
-                        type: "success",
-                        message: `Connected to ${payload.url}`,
-                        timerSeconds: 5,
-                        autoDismiss: true
-                    });
-                }
-            } else if (window.DWSNotifications) {
-                window.DWSNotifications.push({
-                    title: "OctoPrint Connection Failed",
-                    icon: "⚠",
-                    type: "error",
-                    message: data.error || "Failed to reach OctoPrint API.",
-                    liveElapsed: true
-                });
-            }
-        });
-    }
-
     serverForm.addEventListener("submit", async (e) => {
         e.preventDefault();
         const payload = {
@@ -834,7 +939,7 @@
 
     async function loadServerState() {
         try {
-            const res = await fetch("/api/settings");
+            const res = await fetch(`/api/settings?_=${Date.now()}`, { cache: "no-store" });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             serverState = await res.json();
             applyThemeAndUI(serverState.ui);
@@ -843,9 +948,18 @@
             renderSettingsServersList(serverState.servers);
             restoreSavedDropdownWidget();
 
+            if (serverState.updater) {
+                renderUpdaterStatus(serverState.updater);
+            }
+
             if (serverState.octoprint) {
                 document.getElementById("octo-enabled-toggle").checked = Boolean(serverState.octoprint.enabled);
-                document.getElementById("octo-url-input").value = serverState.octoprint.url || "http://192.168.2.100";
+                document.getElementById("octo-url-input").value =
+                    serverState.octoprint.url || "https://octoprint-rfdtq2xvdwq.teamexist.com";
+                if (serverState.octoprint.has_key) {
+                    document.getElementById("octo-key-input").placeholder =
+                        "API Key stored on server (paste new key to replace)";
+                }
             }
 
             await renderBackground(serverState.background);

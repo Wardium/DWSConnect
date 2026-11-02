@@ -527,11 +527,13 @@
     });
 
     // =========================================================================
-    // LIVE MODULE 4: OCTOPRINT LIVE PRINT PROGRESS & 5-SECOND COMPLETION BANNER
+    // LIVE MODULE 4: OCTOPRINT WARMING UP, LIVE PRINT & 5s COMPLETION BANNER
     // =========================================================================
     let wasPrinting = false;
+    let lastOctoError = null;
 
-    function formatDurationSec(sec) {
+    function formatDurationSec(sec, isWarmingUp) {
+        if (isWarmingUp && (sec === null || sec === undefined)) return "Heating...";
         if (sec === null || sec === undefined || sec < 0) return "Calculating...";
         const hrs = Math.floor(sec / 3600);
         const mins = Math.floor((sec % 3600) / 60);
@@ -544,23 +546,50 @@
     async function pollOctoPrint() {
         if (document.hidden) return;
         try {
-            const res = await fetch("/api/octoprint/status");
+            const res = await fetch(`/api/octoprint/status?_=${Date.now()}`, { cache: "no-store" });
             const data = await res.json();
-            if (!data.ok || !data.enabled) {
+
+            if (!data.enabled) {
                 removeNotification("octoprint-live-job");
+                removeNotification("octoprint-conn-err");
                 return;
             }
 
-            if (data.is_printing) {
-                wasPrinting = true;
-                const pct = data.completion || 0;
-                const etaText = formatDurationSec(data.print_time_left);
+            if (!data.ok) {
+                // Surface connection/auth errors once so it never fails silently
+                if (data.error && data.error !== lastOctoError) {
+                    lastOctoError = data.error;
+                    pushNotification({
+                        id: "octoprint-conn-err",
+                        title: "OctoPrint Connection Issue",
+                        icon: "⚠",
+                        type: "error",
+                        message: `Could not read OctoPrint status: ${data.error}`,
+                        liveElapsed: true
+                    });
+                }
+                return;
+            }
 
-                let existing = document.getElementById("octoprint-live-job");
+            // Clear any prior connection error once reachable
+            lastOctoError = null;
+            removeNotification("octoprint-conn-err");
+
+            if (data.is_active) {
+                if (data.is_printing) {
+                    wasPrinting = true;
+                }
+                const pct = data.completion || 0;
+                const etaText = formatDurationSec(data.print_time_left, data.is_warming_up);
+                const statusTitle = data.is_warming_up
+                    ? "OctoPrint · Warming Up 🔥"
+                    : `OctoPrint · ${data.state || "Printing"}`;
+
+                const existing = document.getElementById("octoprint-live-job");
                 if (!existing) {
                     pushNotification({
                         id: "octoprint-live-job",
-                        title: "OctoPrint · Printing",
+                        title: statusTitle,
                         icon: "🖨",
                         type: "live",
                         pinned: true,
@@ -569,27 +598,44 @@
                             timerPill.classList.remove("hidden");
                             timerPill.id = "octo-eta-pill";
                             bodyEl.innerHTML = `
-                                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px;">
-                                    <strong id="octo-job-name"></strong>
-                                    <span id="octo-job-pct"></span>
+                                <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px;">
+                                    <strong id="octo-job-name" style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:75%;"></strong>
+                                    <span id="octo-job-pct" style="font-weight:700;"></span>
                                 </div>
-                                <div class="drive-meter-track">
+                                <div class="drive-meter-track" style="margin-bottom:7px;">
                                     <div class="drive-meter-fill" id="octo-job-bar" style="width:0%"></div>
+                                </div>
+                                <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text-muted);">
+                                    <span id="octo-nozzle-temp">Nozzle: --°C</span>
+                                    <span id="octo-bed-temp">Bed: --°C</span>
                                 </div>
                             `;
                         }
                     });
+                } else {
+                    const headerTitle = existing.querySelector(".notif-card-title span:last-child");
+                    if (headerTitle) headerTitle.textContent = statusTitle;
                 }
+
                 const pill = document.getElementById("octo-eta-pill");
                 const nameEl = document.getElementById("octo-job-name");
                 const pctEl = document.getElementById("octo-job-pct");
                 const barEl = document.getElementById("octo-job-bar");
+                const nozEl = document.getElementById("octo-nozzle-temp");
+                const bedEl = document.getElementById("octo-bed-temp");
+
                 if (pill) pill.textContent = etaText;
                 if (nameEl) nameEl.textContent = data.file_name;
                 if (pctEl) pctEl.textContent = `${pct}%`;
-                if (barEl) barEl.style.width = `${Math.min(100, pct)}%`;
-            } else if (wasPrinting && (data.completion >= 99.5 || data.state === "Operational")) {
-                // Print just finished! Show completion banner for 5 seconds then remove
+                if (barEl) barEl.style.width = `${Math.max(data.is_warming_up ? 6 : 0, Math.min(100, pct))}%`;
+                if (nozEl && data.temps) {
+                    nozEl.textContent = `Nozzle: ${data.temps.nozzle_actual}°C / ${data.temps.nozzle_target}°C`;
+                }
+                if (bedEl && data.temps) {
+                    bedEl.textContent = `Bed: ${data.temps.bed_actual}°C / ${data.temps.bed_target}°C`;
+                }
+            } else if (wasPrinting) {
+                // Print job just finished: show completion notification for 5 seconds then auto-dismiss
                 wasPrinting = false;
                 removeNotification("octoprint-live-job");
                 pushNotification({
@@ -597,7 +643,7 @@
                     title: "3D Print Finished!",
                     icon: "✅",
                     type: "success",
-                    message: `${data.file_name || "Print job"} completed (100%).`,
+                    message: `${data.file_name || "Print job"} has finished printing.`,
                     timerSeconds: 5,
                     autoDismiss: true
                 });
@@ -607,8 +653,8 @@
         } catch (e) {}
     }
 
-    setInterval(pollOctoPrint, 4000);
-    setTimeout(pollOctoPrint, 1200);
+    setInterval(pollOctoPrint, 3500);
+    setTimeout(pollOctoPrint, 1000);
 
     window.DWSNotifications = {
         push: pushNotification,

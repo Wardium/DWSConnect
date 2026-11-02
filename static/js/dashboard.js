@@ -705,21 +705,29 @@
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(payload)
             });
-            if (res.ok) {
-                const data = await res.json();
+            const data = await res.json();
+            if (res.ok && data.ok) {
                 serverState = data.settings;
                 document.getElementById("octo-key-input").value = "";
                 if (window.DWSNotifications) {
                     window.DWSNotifications.pollOctoPrint();
                     window.DWSNotifications.push({
-                        title: "OctoPrint Linked",
+                        title: "OctoPrint Verified & Linked",
                         icon: "🖨",
                         type: "success",
-                        message: `Watching ${payload.url}`,
+                        message: `Connected to ${payload.url}`,
                         timerSeconds: 5,
                         autoDismiss: true
                     });
                 }
+            } else if (window.DWSNotifications) {
+                window.DWSNotifications.push({
+                    title: "OctoPrint Connection Failed",
+                    icon: "⚠",
+                    type: "error",
+                    message: data.error || "Failed to reach OctoPrint API.",
+                    liveElapsed: true
+                });
             }
         });
     }

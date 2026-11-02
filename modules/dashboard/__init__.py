@@ -73,6 +73,28 @@ def update_ui_settings():
         return jsonify({"ok": False, "error": str(e)}), 400
 
 
+import ssl
+
+def _octoprint_get(base_url, api_key, endpoint):
+    target_url = f"{base_url.rstrip('/')}{endpoint}"
+    req = urllib.request.Request(
+        target_url,
+        headers={
+            "X-Api-Key": api_key,
+            "Accept": "application/json",
+            "User-Agent": (
+                "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0.0.0 Safari/537.36"
+            ),
+        },
+    )
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False
+    ctx.verify_mode = ssl.CERT_NONE
+    with urllib.request.urlopen(req, timeout=4.5, context=ctx) as resp:
+        return json.loads(resp.read().decode("utf-8", errors="replace"))
+
+
 @blueprint.route("/api/octoprint/config", methods=["POST"])
 def save_octoprint_config():
     try:
@@ -87,6 +109,22 @@ def save_octoprint_config():
             octo["api_key"] = data["api_key"].strip()
 
         StorageManager.save_settings(settings)
+
+        # Immediately verify connectivity so errors are never hidden
+        if octo.get("enabled") and octo.get("url") and octo.get("api_key"):
+            try:
+                _octoprint_get(octo["url"], octo["api_key"], "/api/version")
+            except urllib.error.HTTPError as he:
+                return jsonify({
+                    "ok": False,
+                    "error": f"OctoPrint returned HTTP {he.code}. Check your API Key or Cloudflare Access rules."
+                }), 400
+            except Exception as conn_err:
+                return jsonify({
+                    "ok": False,
+                    "error": f"Could not reach OctoPrint: {str(conn_err)}"
+                }), 400
+
         return jsonify({"ok": True, "settings": StorageManager.get_public_settings()})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
@@ -99,33 +137,69 @@ def get_octoprint_status():
     if not octo.get("enabled") or not octo.get("url") or not octo.get("api_key"):
         return jsonify({"ok": False, "enabled": False})
 
-    target_url = f"{octo['url'].rstrip('/')}/api/job"
-    req = urllib.request.Request(
-        target_url,
-        headers={
-            "X-Api-Key": octo["api_key"],
-            "Accept": "application/json"
-        }
-    )
+    base_url = octo["url"].rstrip("/")
+    api_key = octo["api_key"]
+
     try:
-        with urllib.request.urlopen(req, timeout=3.0) as resp:
-            raw = json.loads(resp.read().decode("utf-8", errors="replace"))
-        state_str = str(raw.get("state") or "Offline")
-        prog = raw.get("progress") or {}
-        job = raw.get("job") or {}
+        job_raw = _octoprint_get(base_url, api_key, "/api/job")
+        state_str = str(job_raw.get("state") or "Offline")
+        prog = job_raw.get("progress") or {}
+        job = job_raw.get("job") or {}
         file_info = job.get("file") or {}
 
-        is_printing = any(k in state_str for k in ("Printing", "Paused", "Starting"))
+        # Fetch live temperatures & printer flags from /api/printer
+        temps = {"nozzle_actual": 0.0, "nozzle_target": 0.0, "bed_actual": 0.0, "bed_target": 0.0}
+        flags = {}
+        try:
+            printer_raw = _octoprint_get(base_url, api_key, "/api/printer")
+            t_data = printer_raw.get("temperature") or {}
+            tool0 = t_data.get("tool0") or {}
+            bed = t_data.get("bed") or {}
+            temps = {
+                "nozzle_actual": round(float(tool0.get("actual") or 0.0), 1),
+                "nozzle_target": round(float(tool0.get("target") or 0.0), 1),
+                "bed_actual": round(float(bed.get("actual") or 0.0), 1),
+                "bed_target": round(float(bed.get("target") or 0.0), 1),
+            }
+            flags = (printer_raw.get("state") or {}).get("flags") or {}
+        except Exception:
+            pass
+
+        # Detect warming up (targets set and still climbing)
+        nozzle_heating = temps["nozzle_target"] >= 40 and (temps["nozzle_target"] - temps["nozzle_actual"]) > 2.5
+        bed_heating = temps["bed_target"] >= 35 and (temps["bed_target"] - temps["bed_actual"]) > 1.5
+        is_warming_up = nozzle_heating or bed_heating
+
+        state_lower = state_str.lower()
+        is_printing = (
+            bool(flags.get("printing"))
+            or bool(flags.get("paused"))
+            or any(k in state_lower for k in ("printing", "paused", "starting", "preparing", "heating", "resuming"))
+        )
+
+        completion = round(float(prog.get("completion") or 0.0), 1)
+        print_time_left = prog.get("printTimeLeft")
+        if print_time_left is None and job.get("estimatedPrintTime") and prog.get("printTime"):
+            est = float(job["estimatedPrintTime"])
+            elapsed = float(prog["printTime"])
+            if est > elapsed:
+                print_time_left = int(est - elapsed)
+
         return jsonify({
             "ok": True,
             "enabled": True,
             "state": state_str,
             "is_printing": is_printing,
-            "file_name": file_info.get("display") or file_info.get("name") or "Active Print Job",
-            "completion": round(float(prog.get("completion") or 0.0), 1),
+            "is_warming_up": is_warming_up,
+            "is_active": is_printing or is_warming_up,
+            "file_name": file_info.get("display") or file_info.get("name") or "Preheating / Active Job",
+            "completion": completion,
             "print_time": int(prog.get("printTime") or 0),
-            "print_time_left": prog.get("printTimeLeft")
+            "print_time_left": print_time_left,
+            "temps": temps
         })
+    except urllib.error.HTTPError as he:
+        return jsonify({"ok": False, "enabled": True, "error": f"HTTP {he.code} from OctoPrint"})
     except Exception as e:
         return jsonify({"ok": False, "enabled": True, "error": str(e)})
 

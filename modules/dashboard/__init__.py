@@ -1,17 +1,24 @@
+import ssl
 import json
 import time
 import uuid
 import urllib.request
 import urllib.error
 from flask import Blueprint, render_template, jsonify, request, make_response, redirect
+import config
 from core.storage import StorageManager
+from core.updater import get_updater_status, check_and_apply_updates
 
 blueprint = Blueprint("dashboard", __name__)
+BOOT_VERSION = str(int(time.time()))
 
 
 @blueprint.after_app_request
 def add_performance_headers(response):
-    if request.path.startswith("/static/"):
+    # Never hard-cache JS/CSS so GitHub auto-updates apply immediately on refresh
+    if request.path.endswith((".js", ".css")):
+        response.headers["Cache-Control"] = "no-cache, must-revalidate"
+    elif request.path.startswith("/static/"):
         response.headers["Cache-Control"] = "public, max-age=3600"
     return response
 
@@ -19,7 +26,24 @@ def add_performance_headers(response):
 @blueprint.route("/")
 def index():
     pub = StorageManager.get_public_settings()
-    return render_template("index.html", servers=pub.get("servers", {}))
+    upd = get_updater_status()
+    asset_v = f"{upd.get('current_commit', 'v1')}_{BOOT_VERSION}"
+    return render_template("index.html", servers=pub.get("servers", {}), asset_v=asset_v)
+
+
+@blueprint.route("/api/updater/status", methods=["GET"])
+def api_updater_status():
+    return jsonify({"ok": True, "updater": get_updater_status()})
+
+
+@blueprint.route("/api/updater/check", methods=["POST"])
+def api_updater_check_now():
+    updated = check_and_apply_updates(config.GITHUB_REMOTE, config.GITHUB_BRANCH)
+    return jsonify({
+        "ok": True,
+        "updated": updated,
+        "updater": get_updater_status()
+    })
 
 
 @blueprint.route("/shell/<server_id>")
@@ -46,7 +70,9 @@ def ping():
 
 @blueprint.route("/api/settings", methods=["GET"])
 def get_settings():
-    return jsonify(StorageManager.get_public_settings())
+    pub = StorageManager.get_public_settings()
+    pub["updater"] = get_updater_status()
+    return jsonify(pub)
 
 
 @blueprint.route("/api/ui", methods=["POST"])
@@ -73,8 +99,6 @@ def update_ui_settings():
         return jsonify({"ok": False, "error": str(e)}), 400
 
 
-import ssl
-
 def _octoprint_get(base_url, api_key, endpoint):
     target_url = f"{base_url.rstrip('/')}{endpoint}"
     req = urllib.request.Request(
@@ -91,7 +115,7 @@ def _octoprint_get(base_url, api_key, endpoint):
     ctx = ssl.create_default_context()
     ctx.check_hostname = False
     ctx.verify_mode = ssl.CERT_NONE
-    with urllib.request.urlopen(req, timeout=4.5, context=ctx) as resp:
+    with urllib.request.urlopen(req, timeout=5.0, context=ctx) as resp:
         return json.loads(resp.read().decode("utf-8", errors="replace"))
 
 
@@ -104,28 +128,43 @@ def save_octoprint_config():
 
         octo["enabled"] = bool(data.get("enabled", True))
         if "url" in data and data["url"].strip():
-            octo["url"] = data["url"].strip().rstrip("/")
+            clean_url = data["url"].strip().rstrip("/")
+            if not clean_url.startswith(("http://", "https://")):
+                clean_url = "https://" + clean_url
+            octo["url"] = clean_url
         if "api_key" in data and data["api_key"].strip():
             octo["api_key"] = data["api_key"].strip()
 
         StorageManager.save_settings(settings)
 
-        # Immediately verify connectivity so errors are never hidden
-        if octo.get("enabled") and octo.get("url") and octo.get("api_key"):
+        if not octo.get("api_key"):
+            return jsonify({
+                "ok": False,
+                "error": "No API Key stored. Paste your OctoPrint API Key and click Save."
+            }), 400
+
+        # Immediately test connection & read printer state so the user gets instant feedback
+        if octo.get("enabled") and octo.get("url"):
             try:
-                _octoprint_get(octo["url"], octo["api_key"], "/api/version")
+                job_raw = _octoprint_get(octo["url"], octo["api_key"], "/api/job")
+                state_str = str(job_raw.get("state") or "Connected")
+                return jsonify({
+                    "ok": True,
+                    "printer_state": state_str,
+                    "settings": StorageManager.get_public_settings()
+                })
             except urllib.error.HTTPError as he:
                 return jsonify({
                     "ok": False,
-                    "error": f"OctoPrint returned HTTP {he.code}. Check your API Key or Cloudflare Access rules."
+                    "error": f"OctoPrint returned HTTP {he.code}. Check your API Key or URL."
                 }), 400
             except Exception as conn_err:
                 return jsonify({
                     "ok": False,
-                    "error": f"Could not reach OctoPrint: {str(conn_err)}"
+                    "error": f"Could not reach {octo['url']}: {str(conn_err)}"
                 }), 400
 
-        return jsonify({"ok": True, "settings": StorageManager.get_public_settings()})
+        return jsonify({"ok": True, "printer_state": "Disabled", "settings": StorageManager.get_public_settings()})
     except Exception as e:
         return jsonify({"ok": False, "error": str(e)}), 400
 
@@ -147,7 +186,6 @@ def get_octoprint_status():
         job = job_raw.get("job") or {}
         file_info = job.get("file") or {}
 
-        # Fetch live temperatures & printer flags from /api/printer
         temps = {"nozzle_actual": 0.0, "nozzle_target": 0.0, "bed_actual": 0.0, "bed_target": 0.0}
         flags = {}
         try:
@@ -165,7 +203,6 @@ def get_octoprint_status():
         except Exception:
             pass
 
-        # Detect warming up (targets set and still climbing)
         nozzle_heating = temps["nozzle_target"] >= 40 and (temps["nozzle_target"] - temps["nozzle_actual"]) > 2.5
         bed_heating = temps["bed_target"] >= 35 and (temps["bed_target"] - temps["bed_actual"]) > 1.5
         is_warming_up = nozzle_heating or bed_heating

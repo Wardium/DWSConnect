@@ -185,14 +185,19 @@
         } else if (opts.videoUrl) {
             timerPill.classList.remove("hidden");
             timerPill.textContent = "LIVE FEED";
-            const streamFormat = opts.videoType || "video";
+            const rawUrl = (opts.videoUrl || "").trim();
+            const isRtsp = /^rtsps?:\/\//i.test(rawUrl) || opts.videoType === "rtsp";
+            const streamFormat = isRtsp ? "rtsp" : (opts.videoType || "video");
             let mediaHtml = "";
-            if (streamFormat === "mjpeg") {
-                mediaHtml = `<img src="${opts.videoUrl}" alt="${opts.title}" />`;
+            if (streamFormat === "rtsp") {
+                const relayUrl = `/api/stream/rtsp?url=${encodeURIComponent(rawUrl)}`;
+                mediaHtml = `<img src="${relayUrl}" alt="${opts.title || "RTSP Stream"}" />`;
+            } else if (streamFormat === "mjpeg") {
+                mediaHtml = `<img src="${rawUrl}" alt="${opts.title}" />`;
             } else if (streamFormat === "iframe") {
-                mediaHtml = `<iframe src="${opts.videoUrl}" allow="autoplay; fullscreen"></iframe>`;
+                mediaHtml = `<iframe src="${rawUrl}" allow="autoplay; fullscreen"></iframe>`;
             } else {
-                mediaHtml = `<video src="${opts.videoUrl}" autoplay muted loop playsinline controls></video>`;
+                mediaHtml = `<video src="${rawUrl}" autoplay muted loop playsinline controls></video>`;
             }
             body.innerHTML = `
                 ${opts.message ? `<div style="margin-bottom:6px;">${opts.message}</div>` : ""}

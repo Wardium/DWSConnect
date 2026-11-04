@@ -1342,3 +1342,169 @@
     });
     window.addEventListener("DOMContentLoaded", loadServerState);
 })();
+
+// =========================================================================
+    // 9. GATEKEEPER AUTH REDIRECT SETTINGS & LIVE REVOCATION INTERCEPTOR
+    // =========================================================================
+    const _nativeFetch = window.fetch.bind(window);
+    window.fetch = async function (...args) {
+        const response = await _nativeFetch(...args);
+        if (response.status === 401) {
+            try {
+                const clone = response.clone();
+                const data = await clone.json();
+                if (data && data.unauthorized && data.redirect_url) {
+                    window.location.replace(data.redirect_url);
+                }
+            } catch (e) {
+                window.location.reload();
+            }
+        }
+        return response;
+    };
+
+    function injectGatekeeperSettingsTab() {
+        const navTabs = document.querySelector(".settings-nav-tabs");
+        const modalBody = document.querySelector("#settings-modal .modal-body");
+        if (!navTabs || !modalBody || document.getElementById("tab-gatekeeper")) return;
+
+        // 1. Create Tab Button
+        const tabBtn = document.createElement("button");
+        tabBtn.type = "button";
+        tabBtn.className = "settings-tab-btn";
+        tabBtn.dataset.tab = "tab-gatekeeper";
+        tabBtn.textContent = "🔒 Gatekeeper";
+        navTabs.appendChild(tabBtn);
+
+        // 2. Create Tab Pane
+        const pane = document.createElement("div");
+        pane.id = "tab-gatekeeper";
+        pane.className = "settings-tab-pane hidden";
+        pane.innerHTML = `
+            <form id="gatekeeper-auth-form" class="glass-form">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                    <strong style="font-size:13.5px;">Gatekeeper Unauthorized Redirect</strong>
+                    <span class="glass-badge">Server-Side Enforced</span>
+                </div>
+                <p class="settings-help-text">
+                    Any visitor without a valid <code>dws_auth</code> session token on
+                    <code>auth.teamexist.com</code> is redirected to this URL on the backend before
+                    any HTML, scripts, or API data can load.
+                </p>
+
+                <label class="select-label" style="flex-direction:column;align-items:stretch;gap:6px;">
+                    <span>Unauthorized Redirect Destination URL</span>
+                    <input type="text" id="gk-redirect-url-input" placeholder="https://teamexist.com" required />
+                </label>
+
+                <div style="display:flex;flex-wrap:wrap;gap:6px;">
+                    <button type="button" class="glass-pill-btn gk-preset-btn" data-url="https://teamexist.com" data-ret="false">
+                        Preset: teamexist.com
+                    </button>
+                    <button type="button" class="glass-pill-btn gk-preset-btn" data-url="https://auth.teamexist.com/login" data-ret="true">
+                        Preset: Gatekeeper Login
+                    </button>
+                    <button type="button" class="glass-pill-btn gk-preset-btn" data-url="https://www.google.com" data-ret="false">
+                        Preset: Google (Decoy)
+                    </button>
+                </div>
+
+                <label class="checkbox-label" style="margin-top:4px;">
+                    <span>Append <code>?redirect=</code> return URL (for Gatekeeper Login page)</span>
+                    <input type="checkbox" id="gk-append-return-toggle" />
+                </label>
+
+                <div class="settings-divider"></div>
+
+                <label class="select-label" style="flex-direction:column;align-items:stretch;gap:6px;">
+                    <span>Gatekeeper Verify API Endpoint</span>
+                    <input type="text" id="gk-verify-url-input" placeholder="https://auth.teamexist.com/api/verify" />
+                </label>
+
+                <div id="gk-inline-feedback" class="hidden" style="padding:9px 12px;border-radius:12px;font-size:12px;font-weight:600;"></div>
+
+                <button type="submit" id="btn-save-gatekeeper" class="glass-submit-btn">
+                    💾 Save Gatekeeper Redirect Settings
+                </button>
+            </form>
+        `;
+        modalBody.appendChild(pane);
+
+        // Wire up tab switching for the newly injected tab
+        tabBtn.addEventListener("click", () => {
+            document.querySelectorAll(".settings-tab-btn").forEach((b) => b.classList.toggle("active", b === tabBtn));
+            document.querySelectorAll(".settings-tab-pane").forEach((p) => p.classList.toggle("hidden", p !== pane));
+            populateGatekeeperForm(serverState.auth || {});
+        });
+
+        // Keep new tab synced when existing tabs are clicked
+        settingsTabBtns.forEach((btn) => {
+            btn.addEventListener("click", () => {
+                tabBtn.classList.remove("active");
+                pane.classList.add("hidden");
+            });
+        });
+
+        // Preset buttons
+        pane.querySelectorAll(".gk-preset-btn").forEach((btn) => {
+            btn.addEventListener("click", () => {
+                document.getElementById("gk-redirect-url-input").value = btn.dataset.url;
+                document.getElementById("gk-append-return-toggle").checked = btn.dataset.ret === "true";
+            });
+        });
+
+        // Form submit handler
+        const gkForm = document.getElementById("gatekeeper-auth-form");
+        gkForm.addEventListener("submit", async (e) => {
+            e.preventDefault();
+            const feedback = document.getElementById("gk-inline-feedback");
+            const saveBtn = document.getElementById("btn-save-gatekeeper");
+            const redirectUrl = document.getElementById("gk-redirect-url-input").value.trim();
+            const verifyUrl = document.getElementById("gk-verify-url-input").value.trim();
+            const appendReturn = document.getElementById("gk-append-return-toggle").checked;
+
+            saveBtn.textContent = "⏳ Saving...";
+            try {
+                const res = await fetch("/api/auth/config", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                        redirect_url: redirectUrl,
+                        verify_url: verifyUrl,
+                        append_redirect_param: appendReturn
+                    })
+                });
+                const data = await res.json();
+                feedback.classList.remove("hidden");
+                if (res.ok && data.ok) {
+                    serverState = data.settings || serverState;
+                    serverState.auth = data.auth;
+                    populateGatekeeperForm(data.auth);
+                    feedback.style.background = "rgba(16, 185, 129, 0.25)";
+                    feedback.style.border = "1px solid rgba(52, 211, 153, 0.6)";
+                    feedback.textContent = `✅ Saved! Unauthenticated visitors will redirect to: ${data.auth.redirect_url}`;
+                } else {
+                    feedback.style.background = "rgba(239, 68, 68, 0.25)";
+                    feedback.style.border = "1px solid rgba(248, 113, 113, 0.6)";
+                    feedback.textContent = `❌ ${data.error || "Failed to save settings"}`;
+                }
+            } catch (err) {
+                feedback.classList.remove("hidden");
+                feedback.style.background = "rgba(239, 68, 68, 0.25)";
+                feedback.style.border = "1px solid rgba(248, 113, 113, 0.6)";
+                feedback.textContent = `❌ Network error: ${err.message}`;
+            } finally {
+                saveBtn.textContent = "💾 Save Gatekeeper Redirect Settings";
+            }
+        });
+    }
+
+    function populateGatekeeperForm(auth = {}) {
+        const redirInput = document.getElementById("gk-redirect-url-input");
+        const verifyInput = document.getElementById("gk-verify-url-input");
+        const retToggle = document.getElementById("gk-append-return-toggle");
+        if (redirInput) redirInput.value = auth.redirect_url || "https://teamexist.com";
+        if (verifyInput) verifyInput.value = auth.verify_url || "https://auth.teamexist.com/api/verify";
+        if (retToggle) retToggle.checked = Boolean(auth.append_redirect_param);
+    }
+

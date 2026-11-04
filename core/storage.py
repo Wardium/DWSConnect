@@ -9,6 +9,11 @@ import config
 _lock = threading.Lock()
 
 DEFAULT_SETTINGS = {
+    "auth": {
+        "redirect_url": "https://teamexist.com",
+        "verify_url": "https://auth.teamexist.com/api/verify",
+        "append_redirect_param": False
+    },
     "ui": {
         "theme": "auto",           # "auto" (OS sync), "dark", "light", or "custom"
         "accent": "aurora",        # "aurora", "emerald", "plasma", "crimson", "solar", "custom"
@@ -74,7 +79,7 @@ class StorageManager:
         if not isinstance(data, dict):
             return merged
 
-        for key in ("ui", "octoprint", "background", "drive_aliases"):
+        for key in ("auth", "ui", "octoprint", "background", "drive_aliases"):
             if isinstance(data.get(key), dict):
                 merged[key].update(data[key])
                 if key == "ui" and isinstance(data["ui"].get("custom_theme"), dict):

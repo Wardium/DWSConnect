@@ -3,6 +3,8 @@ import importlib
 from flask import Flask
 import config
 from core.storage import StorageManager
+from core.auth_guard import init_auth_guard
+
 
 def create_app():
     app = Flask(
@@ -13,6 +15,9 @@ def create_app():
 
     # Ensure server-side storage directories exist
     StorageManager.initialize()
+
+    # Enforce Gatekeeper authentication before any route or static asset loads
+    init_auth_guard(app)
 
     # Auto-discover and register all modules inside /modules
     modules_dir = os.path.join(config.BASE_DIR, "modules")

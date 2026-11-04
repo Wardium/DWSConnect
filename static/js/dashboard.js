@@ -1343,7 +1343,6 @@
         window.recalculateTopToBottomStagger();
     });
     window.addEventListener("DOMContentLoaded", loadServerState);
-})();
 
 // =========================================================================
     // 9. GATEKEEPER AUTH REDIRECT SETTINGS & LIVE REVOCATION INTERCEPTOR
@@ -1509,4 +1508,4 @@
         if (verifyInput) verifyInput.value = auth.verify_url || "https://auth.teamexist.com/api/verify";
         if (retToggle) retToggle.checked = Boolean(auth.append_redirect_param);
     }
-
+})();

@@ -1306,11 +1306,13 @@
 
     async function loadServerState() {
         injectDeviceLayoutControls();
+        injectGatekeeperSettingsTab();
         applyDeviceGridLayout();
         try {
             const res = await fetch(`/api/settings?_=${Date.now()}`, { cache: "no-store" });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
             serverState = await res.json();
+            populateGatekeeperForm(serverState.auth || {});
             applyThemeAndUI(serverState.ui);
             renderAppGrid(serverState.apps);
             renderSettingsAppList(serverState.apps);

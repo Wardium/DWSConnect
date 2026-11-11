@@ -45,3 +45,12 @@ DEFAULT_SERVERS = {
         "shell_url": "https://device.teamexist.com/shell/3",
     },
 }
+
+# Remote DWSSecureShell Sync Config (192.168.2.91)
+REMOTE_SYNC_ENABLED = True
+REMOTE_SYNC_HOST = "192.168.2.91"
+REMOTE_SYNC_USER = "dylanwardstudios"
+REMOTE_SYNC_PASS = os.environ.get("DWS_SRV2_PASS", "weqr1234")
+REMOTE_SYNC_DIR = "/home/dylanwardstudios/DWSSecureShell"
+# Leave empty to auto-detect the container running DWSSecureShell / port 5000, or set container name explicitly
+REMOTE_DOCKER_CONTAINER = ""

@@ -5,6 +5,7 @@ import uuid
 import threading
 from werkzeug.utils import secure_filename
 import config
+from core.remote_sync import trigger_remote_sync_async
 
 _lock = threading.Lock()
 
@@ -68,10 +69,10 @@ class StorageManager:
         os.makedirs(config.DATA_DIR, exist_ok=True)
         os.makedirs(config.UPLOAD_DIR, exist_ok=True)
         if not os.path.exists(config.SETTINGS_FILE):
-            StorageManager.save_settings(DEFAULT_SETTINGS)
+            StorageManager.save_settings(DEFAULT_SETTINGS, sync_remote=False)
         else:
             current = StorageManager.load_settings()
-            StorageManager.save_settings(current)
+            StorageManager.save_settings(current, sync_remote=False)
 
     @staticmethod
     def _merge_defaults(data):
@@ -115,12 +116,30 @@ class StorageManager:
                 return copy.deepcopy(DEFAULT_SETTINGS)
 
     @staticmethod
-    def save_settings(data):
+    def save_settings(data, sync_remote=True):
+        servers_changed = False
         with _lock:
+            old_servers = None
+            if os.path.exists(config.SETTINGS_FILE):
+                try:
+                    with open(config.SETTINGS_FILE, "r", encoding="utf-8") as f:
+                        old_raw = json.load(f)
+                        old_servers = old_raw.get("servers")
+                except Exception:
+                    old_servers = None
+
             clean = StorageManager._merge_defaults(data)
+
+            if old_servers is not None and old_servers != clean.get("servers"):
+                servers_changed = True
+
             with open(config.SETTINGS_FILE, "w", encoding="utf-8") as f:
                 json.dump(clean, f, indent=4)
-            return clean
+
+        if sync_remote and servers_changed:
+            trigger_remote_sync_async(clean["servers"])
+
+        return clean
 
     @staticmethod
     def get_public_settings():
